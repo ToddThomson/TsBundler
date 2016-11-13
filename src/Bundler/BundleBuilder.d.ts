@@ -1,0 +1,35 @@
+import { WatchCompilerHost } from "../Compiler/WatchCompilerHost";
+import { Bundle } from "./BundleParser";
+import { BundleResult } from "./BundleResult";
+import * as ts from "typescript";
+export declare class BundleBuilder {
+    private bundle;
+    private compilerHost;
+    private program;
+    private dependencyTime;
+    private dependencyWalkTime;
+    private emitTime;
+    private buildTime;
+    private bundleCodeText;
+    private bundleImportText;
+    private bundleImportedFiles;
+    private bundleModuleImports;
+    private bundleSourceFiles;
+    constructor(compilerHost: WatchCompilerHost, program: ts.Program);
+    build(bundle: Bundle): BundleResult;
+    private processModuleDependencies(moduleDependencyNode, dependencyNodes);
+    private isInheritedBinding(dependencyNode, namedBindings);
+    private getImportModuleName(node);
+    private addModuleImport(moduleName, importName);
+    private writeImportDeclaration(node);
+    private processImportExports(file);
+    private whiteOut(pos, end, text);
+    private emitModuleImportDeclaration(moduleBlockText);
+    private addSourceFile(file);
+    private isSourceCodeFile(file);
+    private isSourceCodeModule(importSymbol);
+    private isAmbientModule(importSymbol);
+    private getSymbolFromNode(node);
+    private getNamedBindingsFromImport(node);
+    private reportStatistics();
+}

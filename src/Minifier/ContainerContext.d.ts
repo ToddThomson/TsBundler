@@ -1,0 +1,34 @@
+import * as ts from "typescript";
+import { Ast } from "../Ast/Ast";
+import { IdentifierInfo } from "./IdentifierSymbolInfo";
+export declare class Container {
+    private id;
+    private container;
+    private blockScopeContainer;
+    private containerFlags;
+    private parent;
+    private childContainers;
+    private isBlockScope;
+    private baseClass;
+    private nameIndex;
+    namesExcluded: ts.MapLike<boolean>;
+    localIdentifiers: ts.MapLike<IdentifierInfo>;
+    classifiableSymbols: ts.MapLike<ts.Symbol>;
+    excludedIdentifiers: ts.MapLike<IdentifierInfo>;
+    excludedProperties: ts.Symbol[];
+    shortenedIdentifierCount: number;
+    constructor(node: ts.Node, containerFlags: Ast.ContainerFlags, parentContainer: Container);
+    getId(): number;
+    addChildContainer(container: Container): void;
+    getChildren(): Container[];
+    getParent(): Container;
+    getNameIndex(): number;
+    getNode(): ts.Node;
+    getMembers(): ts.NodeArray<ts.Declaration>;
+    getLocals(): ts.SymbolTable;
+    isBlockScoped(): boolean;
+    isFunctionScoped(): boolean;
+    setBaseClass(baseClass: ts.Symbol): void;
+    getBaseClass(): ts.Symbol;
+    hasChild(container: Container): boolean;
+}

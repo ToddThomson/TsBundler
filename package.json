@@ -1,0 +1,64 @@
+{
+  "name": "tspackage",
+  "version": "1.0.0-beta.1",
+  "author": "Todd Thomson <todd.thomson@me.com>",
+  "description": "Typescript package minifier and modular typescript bundle optimizer.",
+  "license": "MIT",
+  "main": "./tspackage.min.js",
+  "typings": "./tspackage.d.ts",
+  "dependencies": {
+    "@types/chalk": "^0.4.31",
+    "@types/chokidar": "^1.4.29",
+    "@types/glob": "^5.0.30",
+    "@types/lodash": "^4.14.38",
+    "@types/node": "^6.0.46",
+    "@types/vinyl": "^1.2.30",
+    "chalk": "^1.1.3",
+    "chokidar": "^1.6.1",
+    "glob": "^7.1.1",
+    "lodash": "^4.16.6",
+    "readable-stream": "^2.2.1",
+    "typescript": "^2.0.9",
+    "vinyl": "^1.2.0"
+  },
+  "devDependencies": {
+    "gulp": "^3.9.1",
+    "del": "^2.2.2",
+    "require-dir": "^0.3.1",
+    "run-sequence": "^1.2.2",
+    "typescript": "^2.0.9",
+    "tsproject": "^2.0.2",
+    "vinyl-paths": "^2.1.0"
+  },
+  "keywords": [
+    "bundle",
+    "bundling",
+    "typescript minifier",
+    "minify",
+    "minification",
+    "compiler",
+    "cache optimized compiler",
+    "incremental build",
+    "d.ts",
+    "declaration",
+    "definitions",
+    "ES6 external modules",
+    "library",
+    "modular typescript",
+    "module bundles",
+    "optimizer",
+    "project",
+    "transpiler",
+    "tsconfig.json",
+    "typescript bundles"
+  ],
+  "homepage": "https://github.com/toddthomson/tspackage",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/toddthomson/tspackage.git"
+  },
+  "bugs": "https://github.com/toddthomson/tsproject/issues",
+  "scripts": {
+    "build": "gulp build"
+  }
+}
