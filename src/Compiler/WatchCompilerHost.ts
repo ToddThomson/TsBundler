@@ -14,7 +14,7 @@ import { Utils } from "../Utils/Utilities";
 export class WatchCompilerHost extends CachingCompilerHost {
 
     private reuseableProgram: ts.Program;
-    private onSourceFileChanged;
+    private onSourceFileChanged: ( sourceFile: ts.SourceFile, path: string, stats: any ) => void;
 
     constructor( compilerOptions: ts.CompilerOptions, onSourceFileChanged?: ( sourceFile: ts.SourceFile, path: string, stats: any ) => void ) {
         super( compilerOptions );

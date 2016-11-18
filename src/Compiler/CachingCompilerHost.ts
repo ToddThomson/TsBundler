@@ -3,6 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as chokidar from "chokidar";
 
+import { TsCompilerOptions } from "./TsCompilerOptions";
 import { Logger } from "../Reporting/Logger";
 import { TsCore } from "../Utils/TsCore";
 import { Utils } from "../Utils/Utilities";
@@ -13,16 +14,17 @@ import { Utils } from "../Utils/Utilities";
 export class CachingCompilerHost implements ts.CompilerHost {
 
     private output: ts.MapLike<string> = {};
+
     private dirExistsCache: ts.MapLike<boolean> = {};
     private dirExistsCacheSize: number = 0;
     private fileExistsCache: ts.MapLike<boolean> = {};
     private fileExistsCacheSize: number = 0;
     private fileReadCache: ts.MapLike<string> = {};
 
-    protected compilerOptions;
+    protected compilerOptions: TsCompilerOptions;
     private baseHost: ts.CompilerHost;
 
-    constructor( compilerOptions: ts.CompilerOptions ) {
+    constructor( compilerOptions: TsCompilerOptions ) {
         this.compilerOptions = compilerOptions;
         this.baseHost = ts.createCompilerHost( this.compilerOptions );
     }
@@ -32,44 +34,43 @@ export class CachingCompilerHost implements ts.CompilerHost {
     }
 
     public getSourceFileImpl( fileName: string, languageVersion: ts.ScriptTarget, onError?: ( message: string ) => void ): ts.SourceFile {
-
         // Use baseHost to get the source file
-        //Logger.trace( "getSourceFile() reading source file from fs: ", fileName );
         return this.baseHost.getSourceFile( fileName, languageVersion, onError );
     }
 
     public getSourceFile = this.getSourceFileImpl;
 
     public writeFile( fileName: string, data: string, writeByteOrderMark: boolean, onError?: ( message: string ) => void ) {
-        this.output[fileName] = data;
+        if ( this.compilerOptions.compileToMemory ) {
+            this.output[ fileName ] = data;
+        }
+        else {
+            this.baseHost.writeFile( fileName, data, writeByteOrderMark, onError );
+        }
     }
 
     public fileExists = ( fileName: string ): boolean => {
-        fileName = this.getCanonicalFileName( fileName );
+        const fullFileName = this.getCanonicalFileName( fileName );
 
         // Prune off searches on directories that don't exist
-        if ( !this.directoryExists( path.dirname( fileName ) ) ) {
+        if ( !this.directoryExists( path.dirname( fullFileName ) ) ) {
             return false;
         }
 
-        if ( Utils.hasProperty( this.fileExistsCache, fileName ) ) {
-            //Logger.trace( "fileExists() Cache hit: ", fileName, this.fileExistsCache[ fileName ] );
-            return this.fileExistsCache[fileName];
+        if ( Utils.hasProperty( this.fileExistsCache, fullFileName ) ) {
+            return this.fileExistsCache[ fullFileName ];
         }
         this.fileExistsCacheSize++;
 
-        //Logger.trace( "fileExists() Adding to cache: ", fileName, this.baseHost.fileExists( fileName ), this.fileExistsCacheSize );
-        return this.fileExistsCache[fileName] = this.baseHost.fileExists( fileName );
+        return this.fileExistsCache[ fullFileName ] = this.baseHost.fileExists( fullFileName );
     }
 
-    public readFile( fileName ): string {
+    public readFile( fileName: string ): string {
         if ( Utils.hasProperty( this.fileReadCache, fileName ) ) {
-            Logger.trace( "readFile() cache hit: ", fileName );
-            return this.fileReadCache[fileName];
+            return this.fileReadCache[ fileName ];
         }
 
-        Logger.trace( "readFile() Adding to cache: ", fileName );
-        return this.fileReadCache[fileName] = this.baseHost.readFile( fileName );
+        return this.fileReadCache[ fileName ] = this.baseHost.readFile( fileName );
     }
 
     // Use Typescript CompilerHost "base class" implementation..
@@ -99,15 +100,12 @@ export class CachingCompilerHost implements ts.CompilerHost {
     }
 
     public directoryExists( directoryPath: string ): boolean {
-
         if ( Utils.hasProperty( this.dirExistsCache, directoryPath ) ) {
-            //Logger.trace( "dirExists() hit", directoryPath, this.dirExistsCache[ directoryPath ] );
-            return this.dirExistsCache[directoryPath];
+            return this.dirExistsCache[ directoryPath ];
         }
         
         this.dirExistsCacheSize++;
 
-        //Logger.trace( "dirExists Adding: ", directoryPath, ts.sys.directoryExists( directoryPath ), this.dirExistsCacheSize );
-        return this.dirExistsCache[directoryPath] = ts.sys.directoryExists( directoryPath );
+        return this.dirExistsCache[ directoryPath ] = ts.sys.directoryExists( directoryPath );
     }
 }

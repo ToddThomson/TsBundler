@@ -1,5 +1,6 @@
 ﻿import * as ts from "typescript";
 
+
 export interface BundleFile {
     path: string,
     extension: string,
@@ -8,12 +9,10 @@ export interface BundleFile {
 
 export class BundleResult {
 
-    private status: ts.ExitStatus;
     private errors: ts.Diagnostic[];
-    private bundleSource: BundleFile;
+    private bundleSource?: BundleFile;
 
-    constructor( status: ts.ExitStatus, errors?: ts.Diagnostic[], bundleSource?: BundleFile ) {
-        this.status = status;
+    constructor( errors: ts.Diagnostic[], bundleSource?: BundleFile ) {
         this.errors = errors;
         this.bundleSource = bundleSource;
     }
@@ -26,11 +25,7 @@ export class BundleResult {
         return this.errors;
     }
     
-    public getStatus(): ts.ExitStatus {
-        return this.status;
-    }
-
     public succeeded(): boolean {
-        return ( this.status === ts.ExitStatus.Success );
+        return ( this.errors.length == 0 );
     }
 }

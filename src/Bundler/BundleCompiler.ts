@@ -7,7 +7,7 @@ import { Logger } from "../Reporting/Logger";
 import { TsVinylFile } from "../Project/TsVinylFile";
 import { BundleParser, Bundle, BundleConfig } from "../Bundler/BundleParser";
 import { BundleResult, BundleFile } from "../Bundler/BundleResult";
-import { BundleMinifier } from "../Minifier/BundleMinifier";
+//import { BundleMinifier } from "../Minifier/BundleMinifier";
 import { DependencyBuilder } from "./DependencyBuilder";
 import { Glob } from "../Project/Glob";
 
@@ -17,12 +17,12 @@ import { TsCore } from "../Utils/TsCore";
 import * as ts from "typescript";
 import * as fs from "fs";
 import * as path from "path";
+import * as tsMinifier from "tsminifier";
 
 export class BundleCompiler {
 
     private compilerHost: WatchCompilerHost;
     private program: ts.Program;
-    private outputStream: CompileStream;
     private compilerOptions: TsCompilerOptions;
 
     private emitTime: number = 0;
@@ -31,10 +31,9 @@ export class BundleCompiler {
 
     private bundleSourceFiles: ts.MapLike<string> = {};
 
-    constructor( compilerHost: WatchCompilerHost, program: ts.Program, outputStream: CompileStream ) {
+    constructor( compilerHost: WatchCompilerHost, program: ts.Program ) {
         this.compilerHost = compilerHost
         this.program = program;
-        this.outputStream = outputStream;
         this.compilerOptions = this.program.getCompilerOptions();
     }
 
@@ -126,13 +125,13 @@ export class BundleCompiler {
 
         // Return if noEmitOnError flag is set, and we have errors
         if ( this.compilerOptions.noEmitOnError && preEmitDiagnostics.length > 0 ) {
-            return new CompilerResult( ts.ExitStatus.DiagnosticsPresent_OutputsSkipped, preEmitDiagnostics );
+            return new CompilerResult( true, preEmitDiagnostics );
         }
 
         if ( minifyBundle ) {
             Logger.log( "Minifying bundle..." );
-            let minifier = new BundleMinifier( bundlerProgram, compilerOptions, bundleConfig );
-            bundleSourceFile = minifier.transform( bundleSourceFile );
+            //let minifier = new tsMinifier..Minifier( bundlerProgram, compilerOptions, bundleConfig );
+            bundleSourceFile = tsMinifier.minifySourceFile( bundleSourceFile, bundlerProgram, compilerOptions );
         }
 
         this.emitTime = new Date().getTime();
@@ -141,92 +140,89 @@ export class BundleCompiler {
 
         this.emitTime = new Date().getTime() - this.emitTime;
 
-        // Always stream the bundle source file ts - even if emit errors.
-        Logger.info( "Streaming vinyl bundle source: ", bundleFileName );
-        var tsVinylFile = new TsVinylFile( {
-            path: bundleFileName,
-            contents: new Buffer( bundleSourceFile.text )
-        });
+        // TODO: Decouple task
 
-        this.outputStream.push( tsVinylFile );
+        // Always stream the bundle source file ts - even if emit errors.
+        //Logger.info( "Streaming vinyl bundle source: ", bundleFileName );
+        //var tsVinylFile = new TsVinylFile( {
+        //    path: bundleFileName,
+        //    contents: new Buffer( bundleSourceFile.text )
+        //});
+
+        //this.outputStream.push( tsVinylFile );
         
         // Concat any emit errors
         let allDiagnostics = preEmitDiagnostics.concat( emitResult.diagnostics );
         
         // If the emitter didn't emit anything, then pass that value along.
         if ( emitResult.emitSkipped ) {
-            return new CompilerResult( ts.ExitStatus.DiagnosticsPresent_OutputsSkipped, allDiagnostics );
+            return new CompilerResult( true, allDiagnostics );
         }
 
         // The emitter emitted something, inform the caller if that happened in the presence of diagnostics.
         if ( this.compilerOptions.noEmitOnError && allDiagnostics.length > 0 ) {
-            return new CompilerResult( ts.ExitStatus.DiagnosticsPresent_OutputsGenerated, allDiagnostics );
+            return new CompilerResult( false, allDiagnostics, emitResult.emittedFiles, outputText );
         }
 
         // Emit the output files even if errors ( noEmitOnError is false ).
 
-        // Stream the emitted files...
-        let bundleDir = path.dirname( bundleFile.path );
-        let bundleName = path.basename( bundleFile.path, bundleFile.extension );
-        let bundlePrefixExt = minifyBundle ? ".min" : "";
+        //// Stream the emitted files...
+        //let bundleDir = path.dirname( bundleFile.path );
+        //let bundleName = path.basename( bundleFile.path, bundleFile.extension );
+        //let bundlePrefixExt = minifyBundle ? ".min" : "";
 
-        let jsBundlePath = TsCore.normalizeSlashes( path.join( bundleDir, bundleName + bundlePrefixExt + ".js" ) );
+        //let jsBundlePath = TsCore.normalizeSlashes( path.join( bundleDir, bundleName + bundlePrefixExt + ".js" ) );
 
-        // js should have been generated, but just in case!
-        if ( Utils.hasProperty( outputText, jsBundlePath ) ) {
-            let jsContents = outputText[ jsBundlePath ];
-            if ( minifyBundle ) {
-                // Whitespace removal cannot be performed in the AST minification transform, so we do it here for now
-                let minifier = new BundleMinifier( bundlerProgram, compilerOptions, bundleConfig );
-                jsContents = minifier.removeWhitespace( jsContents );
+        //// js should have been generated, but just in case!
+        //if ( Utils.hasProperty( outputText, jsBundlePath ) ) {
+        //    let jsContents = outputText[ jsBundlePath ];
+        //    if ( minifyBundle ) {
+        //        // Whitespace removal cannot be performed in the AST minification transform, so we do it here for now
+        //        let minifier = new BundleMinifier( bundlerProgram, compilerOptions, bundleConfig );
+        //        jsContents = minifier.removeWhitespace( jsContents );
                 
-            }
-            Logger.info( "Streaming vinyl js: ", bundleName );
-            var bundleJsVinylFile = new TsVinylFile( {
-                path: jsBundlePath,
-                contents: new Buffer( jsContents )
-            });
+        //    }
+        //    Logger.info( "Streaming vinyl js: ", bundleName );
+        //    var bundleJsVinylFile = new TsVinylFile( {
+        //        path: jsBundlePath,
+        //        contents: new Buffer( jsContents )
+        //    });
 
-            this.outputStream.push( bundleJsVinylFile );
-        }
+        //    this.outputStream.push( bundleJsVinylFile );
+        //}
 
-        let dtsBundlePath = TsCore.normalizeSlashes( path.join( bundleDir, bundleName + bundlePrefixExt + ".d.ts" ) );
+        //let dtsBundlePath = TsCore.normalizeSlashes( path.join( bundleDir, bundleName + bundlePrefixExt + ".d.ts" ) );
         
-        // d.ts is generated, if compiler option declaration is true
-        if ( Utils.hasProperty( outputText, dtsBundlePath ) ) {
-            Logger.info( "Streaming vinyl d.ts: ", dtsBundlePath );
-            var bundleDtsVinylFile = new TsVinylFile( {
-                path: dtsBundlePath,
-                contents: new Buffer( outputText[ dtsBundlePath ] )
-            });
+        //// d.ts is generated, if compiler option declaration is true
+        //if ( Utils.hasProperty( outputText, dtsBundlePath ) ) {
+        //    Logger.info( "Streaming vinyl d.ts: ", dtsBundlePath );
+        //    var bundleDtsVinylFile = new TsVinylFile( {
+        //        path: dtsBundlePath,
+        //        contents: new Buffer( outputText[ dtsBundlePath ] )
+        //    });
 
-            this.outputStream.push( bundleDtsVinylFile );
-        }
+        //    this.outputStream.push( bundleDtsVinylFile );
+        //}
 
-        let mapBundlePath = TsCore.normalizeSlashes( path.join( bundleDir, bundleName + bundlePrefixExt + ".js.map" ) );
+        //let mapBundlePath = TsCore.normalizeSlashes( path.join( bundleDir, bundleName + bundlePrefixExt + ".js.map" ) );
         
-        // js.map is generated, if compiler option sourceMap is true
-        if ( Utils.hasProperty( outputText, mapBundlePath ) ) {
-            Logger.info( "Streaming vinyl js.map: ", mapBundlePath );
-            var bundleMapVinylFile = new TsVinylFile( {
-                path: mapBundlePath,
-                contents: new Buffer( outputText[mapBundlePath] )
-            });
+        //// js.map is generated, if compiler option sourceMap is true
+        //if ( Utils.hasProperty( outputText, mapBundlePath ) ) {
+        //    Logger.info( "Streaming vinyl js.map: ", mapBundlePath );
+        //    var bundleMapVinylFile = new TsVinylFile( {
+        //        path: mapBundlePath,
+        //        contents: new Buffer( outputText[mapBundlePath] )
+        //    });
 
-            this.outputStream.push( bundleMapVinylFile );
-        }
+        //    this.outputStream.push( bundleMapVinylFile );
+        //}
 
         this.compileTime = new Date().getTime() - this.compileTime;
 
         if ( this.compilerOptions.diagnostics )
             this.reportStatistics();
 
-        if ( allDiagnostics.length > 0 ) {
-            return new CompilerResult( ts.ExitStatus.DiagnosticsPresent_OutputsGenerated, allDiagnostics );
-        }
-        else {
-            return new CompilerResult( ts.ExitStatus.Success );
-        }
+        return new CompilerResult( false, allDiagnostics );
     }
 
     private reportStatistics() {

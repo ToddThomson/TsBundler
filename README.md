@@ -1,9 +1,11 @@
-﻿[![npm version](https://badge.fury.io/js/tsproject.svg)](http://badge.fury.io/js/tsproject)
-﻿[![Build Status](https://travis-ci.org/ToddThomson/tsproject.svg?branch=master)](https://travis-ci.org/ToddThomson/tsproject)
-# TsProject
-TsProject is a Typescript minifier and modular bundle optimizing compiler which utilizes the Typescript project configuration file, tsconfig.json, to provide a compilation context for source files, module bundles and compile options.
+﻿[![npm version](https://badge.fury.io/js/tsbundler.svg)](http://badge.fury.io/js/tsbundler)
+﻿[![Build Status](https://travis-ci.org/ToddThomson/tsbundler.svg?branch=master)](https://travis-ci.org/ToddThomson/tsbundler)
+# TsBundler
+TsBundler is a Typescript single module bundler and minifier.
 
-TsProject produces a compiled output stream of vinyl files for further processing in the gulp build pipeline.
+## NOTICE
+
+TsBundler is the replacement for TsProject. This is currently a work in progress. Please continue to use TsProject for now.
 
 ## Top Features
 
@@ -14,22 +16,20 @@ TsProject produces a compiled output stream of vinyl files for further processin
  
 ## What's New
 
-TsProject 2.0.2 supports Typescript 2.x.
+TsBundler 1.0.0 supports Typescript 2.x.
 
-TsProject 2.0.0 provides improved bundle minification by shortening identifiers and whitespace removal.
+## Why TsBundler?
 
-## Why TsProject?
+TsBundler is the only Typescript 2.0 transpiler that provides minified, single file typescript bundles and javascript bundles for packaging of Typescript, javascript and Typescript definition files.
+TsBundler bundles file dependencies of external Typescript modules at compilation time rather than relying on build tools (AMD Optimizer, r.js for example ) further down in the build pipeline.
 
-TsProject is the only Typescript 2.0 transpiler that provides minified, single file typescript bundles and javascript bundles for packaging of Typescript, javascript and Typescript definition files.
-TsProject bundles file dependencies of external Typescript modules at compilation time rather than relying on build tools (AMD Optimizer, r.js for example ) further down in the build pipeline.
+## TsBundler Wiki
 
-## TsProject Wiki
-
-Additional details can be found on the TsProject [wiki](https://github.com/ToddThomson/tsproject/wiki).
+Additional details can be found on the TsProject [wiki](https://github.com/ToddThomson/tspackage/wiki).
 
 ## Typescript ES6 External Module Bundles
 
-TsProject supports a "bundles" property within the tsconfig.json project file. The "bundles" property may contain a list of named bundles. Each bundle must provide an array of source files and may optionally specify bundle configuration settings. 
+TsBundler supports a "bundles" property within the Typescript project configuration json file. The "bundles" property may contain a list of named bundles. Each bundle must provide an array of source files and may optionally specify bundle configuration settings. 
 The Typescript source file and its dependencies are packaged as a single Typescript file and output with the bundle name. The Typescript bundle is compiled to a single js javascript file and a single d.ts declaration file.
 
 The following is a sample tsconfig.json showing the "bundles" property:
@@ -73,12 +73,19 @@ The following is a sample tsconfig.json showing the "bundles" property:
 ## How to install
 
 ```
-npm install tsproject
+npm install tsbundler
 ```
 
 ## API
 
-    tsproject.src( projectConfigPath: string, settings: any )
+    tsbundler.build( projectConfigPath: string, settings: any, ( result: BuildResult ) => {
+		if ( !result.Succeeded() ){
+			// Handle build errors...
+		}
+		else {
+			// Build succeeded...
+		}
+	});
 
 Where:
 
@@ -86,41 +93,12 @@ Where:
 Or,
 **projectConfigPath** is a relative path to a named Typescript project file.   
 
-## Usage - Gulp Build Pipeline
+## Building TsPackage
 
-TsProject on github contains a [TodoMVC sample](https://github.com/ToddThomson/tsproject/tree/master/TsProjectTodoMVC) to help you get started.
-The sample is built using Angular, Typescript ES6 modules and Require.
-
-Here is a simple gulpfile.js:
-
-```
-var tsproject = require( 'tsproject' );
-var gulp = require( 'gulp' );
-gulp.task( 'build', function() {
-
-    // path to directory of tsconfig.json provided
-    tsproject.src( './src/project' )
-        .pipe(gulp.dest('./build'));
-
-    // path to named configuration file provided and optional settings specified 
-    return tsproject.src( './src/project_a/myconfig.json',
-		{ 
-			logLevel: 1,
-			compilerOptions: {
-				listFiles: true
-			} 
-		})
-        .pipe( gulp.dest( './mybuild' ) );
-
-});
-```
-
-## Building TsProject
-
-TsProject depends on [NPM](https://docs.npmjs.com/) as a package manager and 
+TsBundler depends on [NPM](https://docs.npmjs.com/) as a package manager and 
 [Gulp](https://github.com/gulpjs/gulp/blob/master/docs/getting-started.md) as a build tool. 
 If you haven't already, you'll need to install both these tools in order to 
-build TsProject.
+build TsBundler.
 
 Once Gulp is installed, you can build it with the following commands:
 

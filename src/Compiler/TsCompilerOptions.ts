@@ -11,4 +11,5 @@ export interface TsCompilerOptions extends ts.CompilerOptions {
     diagnostics?: boolean;
     listFiles?: boolean;
     watch?: boolean;
+    compileToMemory?: boolean;
 }

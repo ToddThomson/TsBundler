@@ -114,6 +114,8 @@ export class DependencyBuilder {
         if ( moduleNameExpr && moduleNameExpr.kind === ts.SyntaxKind.StringLiteral ) {
             return this.program.getTypeChecker().getSymbolAtLocation( moduleNameExpr );
         }
+
+        return undefined;
     }
 
     private getSourceFileFromSymbol( importSymbol: ts.Symbol ): ts.SourceFile {

@@ -83,7 +83,7 @@ export class BundleBuilder {
             if ( !bundleSourceFile ) {
                 let diagnostic = TsCore.createDiagnostic( { code: 6060, category: ts.DiagnosticCategory.Error, key: "Bundle_source_file_0_not_found_6060", message: "Bundle source file '{0}' not found." }, bundleSourceFileName );
 
-                return new BundleResult( ts.ExitStatus.DiagnosticsPresent_OutputsSkipped, [diagnostic] );
+                return new BundleResult( [diagnostic] );
             }
 
             // Check for TSX
@@ -183,7 +183,7 @@ export class BundleBuilder {
             this.reportStatistics();
         }
 
-        return new BundleResult( ts.ExitStatus.Success, undefined, bundleFile );
+        return new BundleResult( [], bundleFile );
     }
 
     private processModuleDependencies( moduleDependencyNode: ts.Node, dependencyNodes: ts.Node[] ) {
@@ -440,6 +440,8 @@ export class BundleBuilder {
         if ( moduleNameExpr && moduleNameExpr.kind === ts.SyntaxKind.StringLiteral ) {
             return this.program.getTypeChecker().getSymbolAtLocation( moduleNameExpr );
         }
+
+        return undefined;
     }
 
     private getNamedBindingsFromImport( node: ts.ImportDeclaration ): string[] {

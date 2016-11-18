@@ -15,79 +15,56 @@ export class Compiler {
 
     private compilerHost: CachingCompilerHost;
     private program: ts.Program;
-    private compileStream: CompileStream;
     private compilerOptions: TsCompilerOptions;
 
     private preEmitTime: number = 0;
     private emitTime: number = 0;
-    private compileTime: number = 0;
 
-    constructor( compilerHost: CachingCompilerHost, program: ts.Program, compileStream: CompileStream ) {
+    constructor( compilerHost: CachingCompilerHost, program: ts.Program ) {
         this.compilerHost = compilerHost
         this.program = program;
-        this.compileStream = compileStream;
         this.compilerOptions = this.program.getCompilerOptions();
     }
 
-    public compile( onError?: ( message: string ) => void ): CompilerResult {
-        this.compileTime = this.preEmitTime = new Date().getTime();
+    public compile(): CompilerResult {
+        this.preEmitTime = new Date().getTime();
 
-        Logger.log( "Compiling project files..." );
-
-        // Check for preEmit diagnostics
         var diagnostics = ts.getPreEmitDiagnostics( this.program );
 
-        // Return if noEmitOnError flag is set, and we have errors
         if ( this.compilerOptions.noEmitOnError && diagnostics.length > 0 ) {
-            return new CompilerResult( ts.ExitStatus.DiagnosticsPresent_OutputsSkipped, diagnostics );
+            return new CompilerResult( true, diagnostics );
+        }
+
+        if ( this.compilerOptions.noEmit ) {
+            return new CompilerResult( true, [] );
         }
 
         this.preEmitTime = new Date().getTime() - this.preEmitTime;
 
-        if ( !this.compilerOptions.noEmit ) {
-            // Compile the source files..
-            let startTime = new Date().getTime();
+        // Compile the source files..
+        let startTime = new Date().getTime();
 
-            var emitResult = this.program.emit();
+        var emitResult = this.program.emit();
 
-            this.emitTime = new Date().getTime() - startTime;
+        this.emitTime = new Date().getTime() - startTime;
 
-            diagnostics = diagnostics.concat( emitResult.diagnostics );
+        diagnostics = diagnostics.concat( emitResult.diagnostics );
 
-            // If the emitter didn't emit anything, then we're done
-            if ( emitResult.emitSkipped ) {
-                return new CompilerResult( ts.ExitStatus.DiagnosticsPresent_OutputsSkipped, diagnostics );
-            }
-
-            // Stream the compilation output...
-            var fileOutput = this.compilerHost.getOutput();
-
-            for ( var fileName in fileOutput ) {
-                var fileData = fileOutput[fileName];
-
-                var tsVinylFile = new TsVinylFile( {
-                    path: fileName,
-                    contents: new Buffer( fileData )
-                });
-
-                this.compileStream.push( tsVinylFile );
-            }
+        // If the emitter didn't emit anything, then we're done
+        if ( emitResult.emitSkipped ) {
+            return new CompilerResult( true, diagnostics );
         }
-
-        this.compileTime = new Date().getTime() - this.compileTime;
 
         // The emitter emitted something, inform the caller if that happened in the presence of diagnostics.
         if ( diagnostics.length > 0 ) {
-            return new CompilerResult( ts.ExitStatus.DiagnosticsPresent_OutputsGenerated, diagnostics );
+            return new CompilerResult( false, diagnostics, emitResult.emittedFiles, this.compilerHost.getOutput() );
         }
-
-        // TODO: diagnostics is now internal
 
         if ( this.compilerOptions.diagnostics ) {
             this.reportStatistics();
         }
 
-        return new CompilerResult( ts.ExitStatus.Success );
+        return new CompilerResult( false, [], emitResult.emittedFiles, this.compilerHost.getOutput() );
     }
 
     private reportStatistics() {
@@ -97,7 +74,6 @@ export class Compiler {
         statisticsReporter.reportCount( "Lines", this.compiledLines() );
         statisticsReporter.reportTime( "Pre-emit time", this.preEmitTime );
         statisticsReporter.reportTime( "Emit time", this.emitTime );
-        statisticsReporter.reportTime( "Compile time", this.compileTime );
     }
 
     private compiledLines(): number {

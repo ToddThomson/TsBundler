@@ -1,23 +1,21 @@
 {
+    "compileOnSave": false,
     "compilerOptions": {
         "target": "es5",
         "module": "commonjs",
         "moduleResolution": "node",
-        "declaration": true,
+        "declaration": false,
         "diagnostics": true,
         "listFiles": false,
-        "pretty": true,
+        "listEmittedFiles": true,
         "noEmitOnError": false,
         "noImplicitAny": false,
         "preserveConstEnums": true,
         "removeComments": false,
-        "sourceMap": false,
+        "sourceMap": true,
         "noEmit": false
     },
     "files": [
-        "./Ast/Ast.ts",
-        "./Ast/AstTransform.ts",
-        "./Ast/NodeWalker.ts",
         "./Bundler/BundleBuilder.ts",
         "./Bundler/BundleCompiler.ts",
         "./Bundler/BundlePackage.ts",
@@ -28,16 +26,15 @@
         "./Compiler/Compiler.ts",
         "./Compiler/CompilerError.ts",
         "./Compiler/CompilerResult.ts",
+        "./Compiler/ICompileResult.ts",
         "./Compiler/CompileStream.ts",
         "./Compiler/TsCompilerOptions.ts",
         "./Compiler/WatchCompilerHost.ts",
-        "./Minifier/BundleMinifier.ts",
-        "./Minifier/ContainerContext.ts",
-        "./Minifier/IdentifierSymbolInfo",
-        "./Minifier/NameGenerator.ts",
         "./Project/Glob.ts",
-        "./Project/ProjectBuildContext",
-        "./Project/ProjectConfig",
+        "./Project/ProjectBuildContext.ts",
+        "./Project/ProjectBuildResult.ts",
+        "./Project/ProjectConfig.ts",
+        "./Project/IProject.ts",
         "./Project/Project.ts",
         "./Project/TsVinylFile.ts",
         "./Reporting/DiagnosticsReporter.ts",
@@ -47,14 +44,14 @@
         "./Utils/EventEmitter.ts",
         "./Utils/TsCore.ts",
         "./Utils/Utilities.ts",
-        "./TsPackage.ts"
+        "./TsBundler.ts"
     ],
     "bundles": {
-        "tspackage": {
-            "files": [ "./TsPackage.ts" ],
+        "tsBundler": {
+            "files": [ "./TsBundler.ts" ],
             "config": {
                 "package": "component",
-                "packageNamespace": "TsPackage",
+                "packageNamespace": "TsBundler",
                 "outDir": "./bundle",
                 "minify": false
             }

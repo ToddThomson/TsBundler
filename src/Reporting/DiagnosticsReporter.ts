@@ -27,7 +27,7 @@ export class DiagnosticsReporter {
             output += chalk.gray( `${ diagnostic.file.fileName }(${ loc.line + 1 },${ loc.character + 1 }): ` );
         }
 
-        var category;
+        var category: string;
 
         switch ( diagnostic.category ) {
             case ts.DiagnosticCategory.Error:

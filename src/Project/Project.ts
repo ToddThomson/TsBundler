@@ -3,12 +3,14 @@ import { CompilerResult } from "../Compiler/CompilerResult";
 import { DiagnosticsReporter } from "../Reporting/DiagnosticsReporter";
 import { WatchCompilerHost }  from "../Compiler/WatchCompilerHost";
 import { ProjectBuildContext } from "./ProjectBuildContext";
+import { BuildResult } from "./ProjectBuildResult";
 import { CompileStream }  from "../Compiler/CompileStream";
 import { TsCompilerOptions } from "../Compiler/TsCompilerOptions";
 import { BundleBuilder } from "../Bundler/BundleBuilder";
 import { BundleFile, BundleResult } from "../Bundler/BundleResult";
 import { BundleCompiler } from "../Bundler/BundleCompiler";
 import { ProjectConfig } from "./ProjectConfig";
+import { IProject } from "./IProject";
 import { StatisticsReporter } from "../Reporting/StatisticsReporter";
 import { Logger } from "../Reporting/Logger";
 import { TsVinylFile } from "./TsVinylFile";
@@ -24,7 +26,7 @@ import * as path from "path";
 import * as chalk from "chalk";
 import * as chokidar from "chokidar";
 
-export class Project {
+export class Project implements IProject {
 
     private configFilePath: string;
     private settings: any;
@@ -50,13 +52,15 @@ export class Project {
         this.settings = settings;
     }
 
-    public build( outputStream: CompileStream ): ts.ExitStatus {
+    public build( onDone: ( status: BuildResult ) => void ) {
         let config = this.parseProjectConfig();
 
         if ( !config.success ) {
             DiagnosticsReporter.reportDiagnostics( config.errors );
 
-            return ts.ExitStatus.DiagnosticsPresent_OutputsSkipped;
+            onDone( new BuildResult( config.errors ) );
+
+            return;
         }
 
         this.buildContext = this.createBuildContext( config );
@@ -64,12 +68,11 @@ export class Project {
         Logger.log( "Building Project with: " + chalk.magenta( `${this.configFileName}` ) );
         Logger.log( "TypeScript compiler version: ", ts.version );
 
-        this.outputStream = outputStream;
-
         // Perform the build..
-        var buildStatus = this.buildWorker();
+        var buildResult = this.buildWorker();
 
-        this.reportBuildStatus( buildStatus );
+        // FIXME
+        this.reportBuildStatus( buildResult );
 
         if ( config.compilerOptions.watch ) {
             Logger.log( "Watching for project changes..." );
@@ -78,7 +81,7 @@ export class Project {
             this.completeProjectBuild();
         }
 
-        return buildStatus;
+        onDone( buildResult );
     }
 
     private createBuildContext( config: ProjectConfig ) : ProjectBuildContext {
@@ -113,10 +116,10 @@ export class Project {
 
     private completeProjectBuild(): void {
         // End the build process by sending EOF to the compilation output stream.
-        this.outputStream.push( null );
+        //this.outputStream.push( null );
     }
 
-    private buildWorker(): ts.ExitStatus {
+    private buildWorker(): BuildResult {
         this.totalBuildTime = this.totalPreBuildTime = new Date().getTime();
 
         if ( !this.buildContext ) {
@@ -125,13 +128,11 @@ export class Project {
             if ( !config.success ) {
                 DiagnosticsReporter.reportDiagnostics( config.errors );
 
-                return ts.ExitStatus.DiagnosticsPresent_OutputsSkipped;
+                return new BuildResult( config.errors );
             }
 
             this.buildContext = this.createBuildContext( config );
         }
-
-        let allDiagnostics: ts.Diagnostic[] = [];
 
         let fileNames = this.buildContext.config.fileNames;
         let bundles = this.buildContext.config.bundles;
@@ -147,18 +148,18 @@ export class Project {
         this.buildContext.setProgram( program );
 
         // Compile the project...
-        let compiler = new Compiler( this.buildContext.host, program, this.outputStream );
+        let compiler = new Compiler( this.buildContext.host, program );
 
         this.totalCompileTime = new Date().getTime();
 
-        var compileResult = compiler.compile();
+        var projectCompileResult = compiler.compile();
 
         this.totalCompileTime = new Date().getTime() - this.totalCompileTime;
 
-        if ( !compileResult.succeeded() ) {
-            DiagnosticsReporter.reportDiagnostics( compileResult.getErrors() );
+        if ( !projectCompileResult.succeeded() ) {
+            DiagnosticsReporter.reportDiagnostics( projectCompileResult.getErrors() );
 
-            return compileResult.getStatus();
+            return new BuildResult( projectCompileResult.getErrors() );
         }
 
         if ( compilerOptions.listFiles ) {
@@ -167,30 +168,37 @@ export class Project {
             });
         }
 
+        var allDiagnostics: ts.Diagnostic[] = [];
+        var bundleCompileResults: CompilerResult[] = [];
+        var bundlingResults: BundleResult[] = [];
+
         this.totalBundleTime = new Date().getTime();
 
         // Build bundles..
         var bundleBuilder = new BundleBuilder( this.buildContext.host, this.buildContext.getProgram() );
-        var bundleCompiler = new BundleCompiler( this.buildContext.host, this.buildContext.getProgram(), this.outputStream );
-        var bundleResult: BundleResult;
+        var bundleCompiler = new BundleCompiler( this.buildContext.host, this.buildContext.getProgram() );
 
         for ( var i = 0, len = bundles.length; i < len; i++ ) {
             Logger.log( "Building bundle: ", chalk.cyan( bundles[i].name ) );
 
-            bundleResult = bundleBuilder.build( bundles[i] );
+            var bundleResult = bundleBuilder.build( bundles[i] );
+
+            bundlingResults.push( bundleResult );
 
             if ( !bundleResult.succeeded() ) {
                 DiagnosticsReporter.reportDiagnostics( bundleResult.getErrors() );
+                allDiagnostics.concat( bundleResult.getErrors() );
 
-                return ts.ExitStatus.DiagnosticsPresent_OutputsSkipped;
+                continue;
             }
 
-            compileResult = bundleCompiler.compile( bundleResult.getBundleSource(), bundles[ i ].config );
+            var bundleCompileResult = bundleCompiler.compile( bundleResult.getBundleSource(), bundles[ i ].config );
 
-            if ( !compileResult.succeeded() ) {
-                DiagnosticsReporter.reportDiagnostics( compileResult.getErrors() );
+            bundleCompileResults.push( bundleCompileResult );
 
-                return compileResult.getStatus();
+            if ( !bundleCompileResult.succeeded() ) {
+                DiagnosticsReporter.reportDiagnostics( projectCompileResult.getErrors() );
+                allDiagnostics.concat( projectCompileResult.getErrors() );
             }
         }
 
@@ -201,11 +209,7 @@ export class Project {
             this.reportStatistics();
         }
 
-        if ( allDiagnostics.length > 0 ) {
-            return ts.ExitStatus.DiagnosticsPresent_OutputsGenerated;
-        }
-
-        return ts.ExitStatus.Success;
+        return new BuildResult( allDiagnostics, bundleCompileResults );
     }
 
     private parseProjectConfig(): ProjectConfig {
@@ -312,7 +316,8 @@ export class Project {
 
         let buildStatus = this.buildWorker();
 
-        this.reportBuildStatus( buildStatus );
+        // FIXME
+        //this.reportBuildStatus( buildStatus );
 
         if ( this.buildContext.config.compilerOptions.watch ) {
             Logger.log( "Watching for project changes..." );
@@ -383,8 +388,8 @@ export class Project {
 
             if ( configFileText !== undefined ) {
                 let jsonConfigObject = JSON.parse( configFileText );
-
-                let relativeFileNames = [];
+                let relativeFileNames: string[] = [];
+                
                 fileNames.forEach( fileName => {
                     relativeFileNames.push ( path.relative( configDirPath, fileName ).replace( /\\/g, "/" ) );
                 });
@@ -399,17 +404,12 @@ export class Project {
         }
     }
 
-    private reportBuildStatus( buildStatus: ts.ExitStatus ) {
-        switch ( buildStatus ) {
-            case ts.ExitStatus.Success:
-                Logger.log( chalk.green( "Project build completed successfully." ) );
-                break;
-            case ts.ExitStatus.DiagnosticsPresent_OutputsSkipped:
-                Logger.log( chalk.red( "Build completed with errors." ) );
-                break;
-            case ts.ExitStatus.DiagnosticsPresent_OutputsGenerated:
-                Logger.log( chalk.red( "Build completed with errors. " + chalk.italic( "Outputs generated." ) ) );
-                break;
+    private reportBuildStatus( buildResult: BuildResult ) {
+        if ( buildResult.succeeded() ) {
+            Logger.log( chalk.green( "Project build completed successfully." ) );
+        }
+        else {
+            Logger.log( chalk.red( "Build completed with errors." ) );
         }
     }
 
