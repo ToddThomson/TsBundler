@@ -1,7 +1,9 @@
-﻿import * as TsBundler from "./src/tsbundler";
+﻿import * as tsbundler from "./src/tsbundler";
+var gulp = require( "gulp" );
 
 var buildSettings = {
     logLevel: 0,
+    verbose: true,
     compileToMemory: false,
     compilerOptions: {
         watch: false,
@@ -9,9 +11,12 @@ var buildSettings = {
     }
 };
 
-var bundler = TsBundler.builder( "./src", buildSettings );
+var bundleBuilder = tsbundler.builder( "./src", buildSettings );
 
-bundler.build( ( result: TsBundler.BuildResult ) => {
+bundleBuilder.src()
+    .pipe( gulp.dest( "./dist" ) );
+
+bundleBuilder.build( ( result: tsbundler.BuildResult ) => {
     if ( !result.succeeded ) {
         console.log( "build failed" );
     } else {

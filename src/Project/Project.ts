@@ -1,21 +1,13 @@
-﻿import { Compiler } from "../Compiler/Compiler";
-import { CompilerResult } from "../Compiler/CompilerResult";
-import { DiagnosticsReporter } from "../Reporting/DiagnosticsReporter";
-import { WatchCompilerHost }  from "../Compiler/WatchCompilerHost";
-import { ProjectBuildContext } from "./ProjectBuildContext";
-import { BuildResult } from "./ProjectBuildResult";
-import { CompileStream }  from "../Compiler/CompileStream";
-import { TsCompilerOptions } from "../Compiler/TsCompilerOptions";
-import { BundleBuilder } from "../Bundler/BundleBuilder";
-import { BundleFile, BundleResult } from "../Bundler/BundleResult";
-import { BundleCompiler } from "../Bundler/BundleCompiler";
+﻿//import { DiagnosticsReporter } from "../Reporting/DiagnosticsReporter";
+//import { BuildResult } from "./BuildResult";
+//import { BundleBuilder } from "../Bundler/BundleBuilder";
+import { BundlerOptions } from "../Bundler/BundlerOptions";
+//import { BundleFile, BundleResult } from "../Bundler/BundleResult";
 import { ProjectConfig } from "./ProjectConfig";
-import { IProject } from "./IProject";
-import { StatisticsReporter } from "../Reporting/StatisticsReporter";
+//import { StatisticsReporter } from "../Reporting/StatisticsReporter";
 import { Logger } from "../Reporting/Logger";
-import { TsVinylFile } from "./TsVinylFile";
 import { BundleParser, Bundle } from "../Bundler/BundleParser";
-import { Glob } from "./Glob";
+import { Glob } from "../Utils/Glob";
 import { TsCore } from "../Utils/TsCore";
 import { Utils } from "../Utils/Utilities";
 
@@ -24,195 +16,29 @@ import * as _ from "lodash";
 import * as fs from "fs";
 import * as path from "path";
 import * as chalk from "chalk";
-import * as chokidar from "chokidar";
 
-export class Project implements IProject {
+export class Project {
 
-    private configFilePath: string;
-    private settings: any;
-
-    private outputStream: CompileStream;
-
-    private configFileDir: string;
     private configFileName: string;
+    private configFilePath: string;
+    private settings: BundlerOptions;
 
-    private totalBuildTime: number = 0;
-    private totalCompileTime: number = 0;
-    private totalPreBuildTime: number = 0;
-    private totalBundleTime: number = 0;
+    private config: ProjectConfig;
 
-    private buildContext: ProjectBuildContext;
-
-    private configFileWatcher: fs.FSWatcher;
-
-    private rebuildTimer: NodeJS.Timer;
-
-    constructor( configFilePath: string, settings?: any  ) {
+    constructor( configFilePath: string, settings?: BundlerOptions  ) {
         this.configFilePath = configFilePath;
-        this.settings = settings;
+        this.settings = settings || {};
+
+        this.config = this.parseProjectConfig();
     }
 
-    public build( onDone: ( status: BuildResult ) => void ) {
-        let config = this.parseProjectConfig();
-
-        if ( !config.success ) {
-            DiagnosticsReporter.reportDiagnostics( config.errors );
-
-            onDone( new BuildResult( config.errors ) );
-
-            return;
-        }
-
-        this.buildContext = this.createBuildContext( config );
-
-        Logger.log( "Building Project with: " + chalk.magenta( `${this.configFileName}` ) );
-        Logger.log( "TypeScript compiler version: ", ts.version );
-
-        // Perform the build..
-        var buildResult = this.buildWorker();
-
-        // FIXME
-        this.reportBuildStatus( buildResult );
-
-        if ( config.compilerOptions.watch ) {
-            Logger.log( "Watching for project changes..." );
-        }
-        else {
-            this.completeProjectBuild();
-        }
-
-        onDone( buildResult );
-    }
-
-    private createBuildContext( config: ProjectConfig ) : ProjectBuildContext {
-
-        if ( config.compilerOptions.watch ) {
-            if ( !this.watchProject() ) {
-                config.compilerOptions.watch = false;
-            }
-        }
-
-        let compilerHost = new WatchCompilerHost( config.compilerOptions, this.onSourceFileChanged );
-
-        return new ProjectBuildContext( compilerHost, config );
-    }
-
-    private watchProject() : boolean {
-        if ( !ts.sys.watchFile ) {
-            let diagnostic = TsCore.createDiagnostic( { code: 5001, category: ts.DiagnosticCategory.Warning, key: "The_current_node_host_does_not_support_the_0_option_5001", message: "The current node host does not support the '{0}' option." }, "-watch" );
-            DiagnosticsReporter.reportDiagnostic( diagnostic );
-
-            return false;
-        }
-
-        // Add a watcher to the project config file if we haven't already done so.
-        if ( !this.configFileWatcher ) {
-            this.configFileWatcher = chokidar.watch( this.configFileName );
-            this.configFileWatcher.on( "change", ( path: string, stats: any ) => this.onConfigFileChanged( path, stats ) );
-        }
-
-        return true;
-    }
-
-    private completeProjectBuild(): void {
-        // End the build process by sending EOF to the compilation output stream.
-        //this.outputStream.push( null );
-    }
-
-    private buildWorker(): BuildResult {
-        this.totalBuildTime = this.totalPreBuildTime = new Date().getTime();
-
-        if ( !this.buildContext ) {
-            let config = this.parseProjectConfig();
-
-            if ( !config.success ) {
-                DiagnosticsReporter.reportDiagnostics( config.errors );
-
-                return new BuildResult( config.errors );
-            }
-
-            this.buildContext = this.createBuildContext( config );
-        }
-
-        let fileNames = this.buildContext.config.fileNames;
-        let bundles = this.buildContext.config.bundles;
-        let compilerOptions = this.buildContext.config.compilerOptions;
-
-        // Create a new program to handle the incremental build. Pass the current build context program ( if it exists )
-        // to reuse the current program structure.
-        let program = ts.createProgram( fileNames, compilerOptions, this.buildContext.host, this.buildContext.getProgram() );
-
-        this.totalPreBuildTime = new Date().getTime() - this.totalPreBuildTime;
-
-        // Save the new program to the build context
-        this.buildContext.setProgram( program );
-
-        // Compile the project...
-        let compiler = new Compiler( this.buildContext.host, program );
-
-        this.totalCompileTime = new Date().getTime();
-
-        var projectCompileResult = compiler.compile();
-
-        this.totalCompileTime = new Date().getTime() - this.totalCompileTime;
-
-        if ( !projectCompileResult.succeeded() ) {
-            DiagnosticsReporter.reportDiagnostics( projectCompileResult.getErrors() );
-
-            return new BuildResult( projectCompileResult.getErrors() );
-        }
-
-        if ( compilerOptions.listFiles ) {
-            Utils.forEach( this.buildContext.getProgram().getSourceFiles(), file => {
-                Logger.log( file.fileName );
-            });
-        }
-
-        var allDiagnostics: ts.Diagnostic[] = [];
-        var bundleCompileResults: CompilerResult[] = [];
-        var bundlingResults: BundleResult[] = [];
-
-        this.totalBundleTime = new Date().getTime();
-
-        // Build bundles..
-        var bundleBuilder = new BundleBuilder( this.buildContext.host, this.buildContext.getProgram() );
-        var bundleCompiler = new BundleCompiler( this.buildContext.host, this.buildContext.getProgram() );
-
-        for ( var i = 0, len = bundles.length; i < len; i++ ) {
-            Logger.log( "Building bundle: ", chalk.cyan( bundles[i].name ) );
-
-            var bundleResult = bundleBuilder.build( bundles[i] );
-
-            bundlingResults.push( bundleResult );
-
-            if ( !bundleResult.succeeded() ) {
-                DiagnosticsReporter.reportDiagnostics( bundleResult.getErrors() );
-                allDiagnostics.concat( bundleResult.getErrors() );
-
-                continue;
-            }
-
-            var bundleCompileResult = bundleCompiler.compile( bundleResult.getBundleSource(), bundles[ i ].config );
-
-            bundleCompileResults.push( bundleCompileResult );
-
-            if ( !bundleCompileResult.succeeded() ) {
-                DiagnosticsReporter.reportDiagnostics( projectCompileResult.getErrors() );
-                allDiagnostics.concat( projectCompileResult.getErrors() );
-            }
-        }
-
-        this.totalBundleTime = new Date().getTime() - this.totalBundleTime;
-        this.totalBuildTime = new Date().getTime() - this.totalBuildTime;
-
-        if ( compilerOptions.diagnostics ) {
-            this.reportStatistics();
-        }
-
-        return new BuildResult( allDiagnostics, bundleCompileResults );
+    public getConfig(): ProjectConfig {
+        return this.config;
     }
 
     private parseProjectConfig(): ProjectConfig {
+        var configFileDir: string;
+        
         try {
             var isConfigDirectory = fs.lstatSync( this.configFilePath ).isDirectory();
         }
@@ -222,109 +48,68 @@ export class Project implements IProject {
         }
 
         if ( isConfigDirectory ) {
-            this.configFileDir = this.configFilePath;
+            configFileDir = this.configFilePath;
             this.configFileName = path.join( this.configFilePath, "tsconfig.json" );
         }
         else {
-            this.configFileDir = path.dirname( this.configFilePath );
+            configFileDir = path.dirname( this.configFilePath );
             this.configFileName = this.configFilePath;
         }
 
         Logger.info( "Reading config file:", this.configFileName );
-        let readConfigResult = ts.readConfigFile( this.configFileName, this.readFile );
+        let readConfigResult = ts.readConfigFile( this.configFileName, this.readConfigFile );
 
         if ( readConfigResult.error ) {
-            return { success: false, errors: [readConfigResult.error] };
+            return { success: false, configFile: this.configFileName, errors: [readConfigResult.error] };
         }
 
         let configObject = readConfigResult.config;
 
         // Parse standard project configuration objects: compilerOptions, files.
         Logger.info( "Parsing config file..." );
-        var configParseResult = ts.parseJsonConfigFileContent( configObject, ts.sys, this.configFileDir );
+        var configParseResult = ts.parseJsonConfigFileContent( configObject, ts.sys, configFileDir );
 
         if ( configParseResult.errors.length > 0 ) {
-            return { success: false, errors: configParseResult.errors };
+            return { success: false, configFile: this.configFileName, errors: configParseResult.errors };
         }
 
         // The returned "Files" list may contain file glob patterns. 
-        configParseResult.fileNames = this.expandFileNames( configParseResult.fileNames, this.configFileDir );
-
-        // The glob file patterns in "Files" is an enhancement to the standard Typescript project file (tsconfig.json) spec.
-        // To convert the project file to use only a standard filename list, specify the setting: "convertFiles" : "true"
-        if ( this.settings.convertFiles === true ) {
-            this.convertProjectFileNames( configParseResult.fileNames, this.configFileDir );
-        }
+        configParseResult.fileNames = this.expandFileNames( configParseResult.fileNames, configFileDir );
 
         // Parse "bundle" project configuration objects: compilerOptions, files.
         var bundleParser = new BundleParser();
-        var bundlesParseResult = bundleParser.parseConfigFile( configObject, this.configFileDir );
+        var bundlesParseResult = bundleParser.parseConfigFile( configObject, configFileDir );
 
         if ( bundlesParseResult.errors.length > 0 ) {
-            return { success: false, errors: bundlesParseResult.errors };
+            return { success: false, configFile: this.configFileName, errors: bundlesParseResult.errors };
         }
 
         // The returned bundles "Files" list may contain file glob patterns. 
         bundlesParseResult.bundles.forEach( bundle => {
-            bundle.fileNames = this.expandFileNames( bundle.fileNames, this.configFileDir );
+            bundle.fileNames = this.expandFileNames( bundle.fileNames, configFileDir );
         });
 
         // Parse the command line args to override project file compiler options
-        let settingsCompilerOptions = this.getSettingsCompilerOptions( this.settings, this.configFileDir );
+        let settingsCompilerOptions = this.getSettingsCompilerOptions( this.settings, configFileDir );
 
         // Check for any errors due to command line parsing
         if ( settingsCompilerOptions.errors.length > 0 ) {
-            return { success: false, errors: settingsCompilerOptions.errors };
+            return { success: false, configFile: this.configFileName, errors: settingsCompilerOptions.errors };
         }
 
         let compilerOptions = Utils.extend( settingsCompilerOptions.options, configParseResult.options );
 
-        Logger.info( "Compiler options: ", compilerOptions );
-
         return {
             success: true,
+            configFile: this.configFileName,
+            bundlerOptions: this.settings,
             compilerOptions: compilerOptions,
             fileNames: configParseResult.fileNames,
             bundles: bundlesParseResult.bundles
         }
     }
     
-    private onConfigFileChanged = ( path: string, stats: any ) => {
-        // Throw away the build context and start a fresh rebuild
-        this.buildContext = undefined;
-
-        this.startRebuildTimer();
-    }
-
-    private onSourceFileChanged = ( sourceFile: TsCore.WatchedSourceFile, path: string, stats: any ) => {
-        sourceFile.fileWatcher.unwatch( sourceFile.fileName );
-        sourceFile.fileWatcher = undefined;
-
-        this.startRebuildTimer();
-    }
-
-    private startRebuildTimer() {
-        if ( this.rebuildTimer ) {
-            clearTimeout( this.rebuildTimer );
-        }
-
-        this.rebuildTimer = setTimeout( this.onRebuildTimeout, 250 );
-    }
-
-    private onRebuildTimeout = () => {
-        this.rebuildTimer = undefined;
-
-        let buildStatus = this.buildWorker();
-
-        // FIXME
-        //this.reportBuildStatus( buildStatus );
-
-        if ( this.buildContext.config.compilerOptions.watch ) {
-            Logger.log( "Watching for project changes..." );
-        }
-    }
-
-    private readFile( fileName: string ): string {
+    private readConfigFile( fileName: string ): string {
         return ts.sys.readFile( fileName );
     }
 
@@ -400,26 +185,9 @@ export class Project implements IProject {
             }
         }
         catch( e ) {
-            Logger.log( chalk.yellow( "Converting project files failed." ) );
+            if ( this.config.bundlerOptions.verbose ) {
+                Logger.log( chalk.yellow( "Converting project files failed." ) );
+            }
         }
-    }
-
-    private reportBuildStatus( buildResult: BuildResult ) {
-        if ( buildResult.succeeded() ) {
-            Logger.log( chalk.green( "Project build completed successfully." ) );
-        }
-        else {
-            Logger.log( chalk.red( "Build completed with errors." ) );
-        }
-    }
-
-    private reportStatistics() {
-        let statisticsReporter = new StatisticsReporter();
-
-        statisticsReporter.reportTitle( "Total build times..." );
-        statisticsReporter.reportTime( "Pre-build time", this.totalPreBuildTime );
-        statisticsReporter.reportTime( "Compiling time", this.totalCompileTime );
-        statisticsReporter.reportTime( "Bundling time", this.totalBundleTime );
-        statisticsReporter.reportTime( "Build time", this.totalBuildTime );
     }
 }

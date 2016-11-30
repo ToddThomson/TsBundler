@@ -1,30 +1,26 @@
 import * as ts from "typescript";
+import * as ts2js from "ts2js";
+import * as stream from "stream";
 
 declare namespace TsBundler {
-
-    interface CompilerResult {
-        getErrors(): ts.Diagnostic[];
-        getEmitSkipped(): boolean;
-        getEmittedOutput(): ts.MapLike<string>;
-        getEmittedFiles(): string[];
-        succeeded(): boolean;
+    
+    export interface BundlerOptions {
+        verbose?: boolean;
+        logLevel?: number;
     }
     
-    interface BuildResult {
+    export interface BuildResult {
         errors: ts.Diagnostic[];
-        bundles?: CompilerResult[];
+        bundleOutput?: ts2js.CompilerResult[];
         succeeded(): boolean;
     }
 
-    interface OnBuildCompleteCallback {
-        (status: BuildResult): void;
-    }
-
-    interface BundleBuilder {
-        build( onDone: (result: BuildResult) => void): void;
+    export interface BundleBuilder {
+        build( buildCompleted: (result: BuildResult) => void): void;
+        src(): stream.Readable;
     }
     
-    function builder(configFilePath: string, settings?: any, onDone?: (result: BuildResult) => void): BundleBuilder;
+    export function builder(configFilePath: string, bundlerOptions?: BundlerOptions, buildCompleted?: (result: BuildResult) => void): BundleBuilder;
 }
 
-export default TsBundler;
+export = TsBundler;

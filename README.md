@@ -1,5 +1,5 @@
 ﻿[![npm version](https://badge.fury.io/js/tsbundler.svg)](http://badge.fury.io/js/tsbundler)
-﻿[![Build Status](https://travis-ci.org/ToddThomson/tsbundler.svg?branch=master)](https://travis-ci.org/ToddThomson/tsbundler)
+﻿[![Build Status](https://travis-ci.org/ToddThomson/TsBundler.svg?branch=master)](https://travis-ci.org/ToddThomson/TsBundler)
 # TsBundler
 TsBundler is a Typescript single module bundler and minifier.
 

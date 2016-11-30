@@ -1,7 +1,7 @@
 ﻿import * as ts from "typescript";
 import File = require( "vinyl" );
 
-export class TsVinylFile extends File {
+export class VinylFile extends File {
 
     constructor( options: any ) {
         super( options );

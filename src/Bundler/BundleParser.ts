@@ -6,8 +6,6 @@ import { TsCore } from "../Utils/TsCore";
 import * as ts from "typescript";
 import * as path from "path";
 
-
-
 export interface BundleConfig {
     sourceMap?: boolean;
     declaration?: boolean;

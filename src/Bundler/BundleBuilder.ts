@@ -1,15 +1,10 @@
-﻿import { CompilerResult } from "../Compiler/CompilerResult";
-import { WatchCompilerHost }  from "../Compiler/WatchCompilerHost";
-import { CompileStream }  from "../Compiler/CompileStream";
-import { TsCompilerOptions } from "../Compiler/TsCompilerOptions";
-import { StatisticsReporter } from "../Reporting/StatisticsReporter";
+﻿import { StatisticsReporter } from "../Reporting/StatisticsReporter";
 import { Logger } from "../Reporting/Logger";
-import { TsVinylFile } from "../Project/TsVinylFile";
-import { Glob } from "../Project/Glob";
 import { BundleParser, Bundle } from "./BundleParser";
 import { BundlePackage, BundlePackageType } from "./BundlePackage";
 import { BundleResult } from "./BundleResult";
 import { DependencyBuilder } from "./DependencyBuilder";
+import { Glob } from "../Utils/Glob";
 import { Utils } from "../Utils/Utilities";
 import { TsCore } from "../Utils/TsCore";
 
@@ -21,7 +16,7 @@ export class BundleBuilder {
 
     private bundle: Bundle;
 
-    private compilerHost: WatchCompilerHost;
+    private host: ts.CompilerHost;
     private program: ts.Program;
 
     private dependencyTime = 0;
@@ -36,8 +31,8 @@ export class BundleBuilder {
     private bundleModuleImports: ts.MapLike<ts.MapLike<string>> = {};
     private bundleSourceFiles: ts.MapLike<string> = {};
 
-    constructor( compilerHost: WatchCompilerHost, program: ts.Program ) {
-        this.compilerHost = compilerHost
+    constructor( host: ts.CompilerHost, program: ts.Program ) {
+        this.host = host
         this.program = program;
     }
 
@@ -45,7 +40,7 @@ export class BundleBuilder {
         this.bundle = bundle;
         this.buildTime = new Date().getTime();
 
-        let dependencyBuilder = new DependencyBuilder( this.compilerHost, this.program );
+        let dependencyBuilder = new DependencyBuilder( this.host, this.program );
 
         // Construct bundle output file name
         let bundleBaseDir = path.dirname( bundle.name );
@@ -75,7 +70,7 @@ export class BundleBuilder {
             let fileName = bundle.fileNames[filesKey];
             Logger.info( ">>> Processing bundle file:", fileName );
 
-            let bundleSourceFileName = this.compilerHost.getCanonicalFileName( TsCore.normalizeSlashes( fileName ) );
+            let bundleSourceFileName = this.host.getCanonicalFileName( TsCore.normalizeSlashes( fileName ) );
             Logger.info( "BundleSourceFileName:", bundleSourceFileName );
 
             let bundleSourceFile = this.program.getSourceFile( bundleSourceFileName );
@@ -121,7 +116,7 @@ export class BundleBuilder {
                     var dependencyFile = TsCore.getSourceFileFromSymbol( dependencySymbol );
 
                     if ( dependencyFile && !dependencyFile.isDeclarationFile ) {
-                        let dependencyFileName = this.compilerHost.getCanonicalFileName( dependencyFile.fileName );
+                        let dependencyFileName = this.host.getCanonicalFileName( dependencyFile.fileName );
                         let dependencyNodes = moduleDependencies[ dependencyFileName ];
 
                         if ( dependencyNodes ) {
@@ -179,7 +174,7 @@ export class BundleBuilder {
 
         this.buildTime = new Date().getTime() - this.buildTime;
 
-        if ( (<TsCompilerOptions>this.program.getCompilerOptions()).diagnostics ) {
+        if ( (<any>this.program.getCompilerOptions()).diagnostics ) {
             this.reportStatistics();
         }
 
@@ -192,7 +187,7 @@ export class BundleBuilder {
             var dependencyFile = TsCore.getSourceFileFromSymbol( dependencySymbol );
 
             if ( dependencyFile && !dependencyFile.isDeclarationFile ) {
-                let dependencyFileName = this.compilerHost.getCanonicalFileName( dependencyFile.fileName );
+                let dependencyFileName = this.host.getCanonicalFileName( dependencyFile.fileName );
 
                 var dependencyBindings = this.getNamedBindingsFromImport( <ts.ImportDeclaration>dependencyNode );
                 
@@ -405,7 +400,7 @@ export class BundleBuilder {
 
             this.bundleCodeText += editText + "\n";
 
-            let sourceFileName = this.compilerHost.getCanonicalFileName( file.fileName );
+            let sourceFileName = this.host.getCanonicalFileName( file.fileName );
             this.bundleImportedFiles[ sourceFileName ] = sourceFileName;
         }
         else {

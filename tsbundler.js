@@ -4,15 +4,36 @@ var __extends = (this && this.__extends) || function (d, b) {
     function __() { this.constructor = d; }
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
+var chalk = require("chalk");
 var ts = require("typescript");
 var stream = require("stream");
 var fs = require("fs");
-var chalk = require("chalk");
 var path = require("path");
-var chokidar = require("chokidar");
-var File = require("vinyl");
 var _ = require("lodash");
 var fileGlob = require("glob");
+var ts2js = require("ts2js");
+var tsMinifier = require("tsminifier");
+var File = require("vinyl");
+var BundlePackageType;
+(function (BundlePackageType) {
+    BundlePackageType[BundlePackageType["None"] = 0] = "None";
+    BundlePackageType[BundlePackageType["Library"] = 1] = "Library";
+    BundlePackageType[BundlePackageType["Component"] = 2] = "Component";
+})(BundlePackageType || (BundlePackageType = {}));
+var BundlePackage = (function () {
+    function BundlePackage(packageType, packageNamespace) {
+        this.packageNamespace = undefined;
+        this.packageType = packageType;
+        this.packageNamespace = packageNamespace;
+    }
+    BundlePackage.prototype.getPackageType = function () {
+        return this.packageType;
+    };
+    BundlePackage.prototype.getPackageNamespace = function () {
+        return this.packageNamespace;
+    };
+    return BundlePackage;
+}());
 var level = {
     none: 0,
     error: 1,
@@ -80,6 +101,76 @@ var Logger = (function () {
     Logger.logName = "logger";
     return Logger;
 }());
+var Utils;
+(function (Utils) {
+    function forEach(array, callback) {
+        if (array) {
+            for (var i = 0, len = array.length; i < len; i++) {
+                var result = callback(array[i], i);
+                if (result) {
+                    return result;
+                }
+            }
+        }
+        return undefined;
+    }
+    Utils.forEach = forEach;
+    function contains(array, value) {
+        if (array) {
+            for (var _i = 0, array_1 = array; _i < array_1.length; _i++) {
+                var v = array_1[_i];
+                if (v === value) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    Utils.contains = contains;
+    var hasOwnProperty = Object.prototype.hasOwnProperty;
+    function hasProperty(map, key) {
+        return hasOwnProperty.call(map, key);
+    }
+    Utils.hasProperty = hasProperty;
+    function clone(object) {
+        var result = {};
+        for (var id in object) {
+            result[id] = object[id];
+        }
+        return result;
+    }
+    Utils.clone = clone;
+    function map(array, f) {
+        var result;
+        if (array) {
+            result = [];
+            for (var _i = 0, array_2 = array; _i < array_2.length; _i++) {
+                var v = array_2[_i];
+                result.push(f(v));
+            }
+        }
+        return result;
+    }
+    Utils.map = map;
+    function extend(first, second) {
+        var sentinal = 1;
+        var result = {};
+        for (var id in first) {
+            result[id] = first[id];
+        }
+        for (var id in second) {
+            if (!hasProperty(result, id)) {
+                result[id] = second[id];
+            }
+        }
+        return result;
+    }
+    Utils.extend = extend;
+    function replaceAt(str, index, character) {
+        return str.substr(0, index) + character + str.substr(index + character.length);
+    }
+    Utils.replaceAt = replaceAt;
+})(Utils || (Utils = {}));
 var TsCore;
 (function (TsCore) {
     function fileExtensionIs(path, extension) {
@@ -181,243 +272,6 @@ var TsCore;
     }
     TsCore.outputExtension = outputExtension;
 })(TsCore || (TsCore = {}));
-var Utils;
-(function (Utils) {
-    function forEach(array, callback) {
-        if (array) {
-            for (var i = 0, len = array.length; i < len; i++) {
-                var result = callback(array[i], i);
-                if (result) {
-                    return result;
-                }
-            }
-        }
-        return undefined;
-    }
-    Utils.forEach = forEach;
-    function contains(array, value) {
-        if (array) {
-            for (var _i = 0, array_1 = array; _i < array_1.length; _i++) {
-                var v = array_1[_i];
-                if (v === value) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-    Utils.contains = contains;
-    var hasOwnProperty = Object.prototype.hasOwnProperty;
-    function hasProperty(map, key) {
-        return hasOwnProperty.call(map, key);
-    }
-    Utils.hasProperty = hasProperty;
-    function clone(object) {
-        var result = {};
-        for (var id in object) {
-            result[id] = object[id];
-        }
-        return result;
-    }
-    Utils.clone = clone;
-    function map(array, f) {
-        var result;
-        if (array) {
-            result = [];
-            for (var _i = 0, array_2 = array; _i < array_2.length; _i++) {
-                var v = array_2[_i];
-                result.push(f(v));
-            }
-        }
-        return result;
-    }
-    Utils.map = map;
-    function extend(first, second) {
-        var sentinal = 1;
-        var result = {};
-        for (var id in first) {
-            result[id] = first[id];
-        }
-        for (var id in second) {
-            if (!hasProperty(result, id)) {
-                result[id] = second[id];
-            }
-        }
-        return result;
-    }
-    Utils.extend = extend;
-    function replaceAt(str, index, character) {
-        return str.substr(0, index) + character + str.substr(index + character.length);
-    }
-    Utils.replaceAt = replaceAt;
-})(Utils || (Utils = {}));
-var CompilerResult = (function () {
-    function CompilerResult(emitSkipped, errors, emittedFiles, emittedOutput) {
-        this.emitSkipped = emitSkipped;
-        this.errors = errors;
-        this.emittedOutput = emittedOutput;
-        this.emittedFiles = emittedFiles;
-    }
-    CompilerResult.prototype.getErrors = function () {
-        return this.errors;
-    };
-    CompilerResult.prototype.getEmitSkipped = function () {
-        return this.emitSkipped;
-    };
-    CompilerResult.prototype.getEmittedOutput = function () {
-        return this.emittedOutput;
-    };
-    CompilerResult.prototype.getEmittedFiles = function () {
-        return this.emittedFiles;
-    };
-    CompilerResult.prototype.succeeded = function () {
-        return (this.errors.length == 0);
-    };
-    return CompilerResult;
-}());
-var CachingCompilerHost = (function () {
-    function CachingCompilerHost(compilerOptions) {
-        var _this = this;
-        this.output = {};
-        this.dirExistsCache = {};
-        this.dirExistsCacheSize = 0;
-        this.fileExistsCache = {};
-        this.fileExistsCacheSize = 0;
-        this.fileReadCache = {};
-        this.getSourceFile = this.getSourceFileImpl;
-        this.fileExists = function (fileName) {
-            var fullFileName = _this.getCanonicalFileName(fileName);
-            // Prune off searches on directories that don't exist
-            if (!_this.directoryExists(path.dirname(fullFileName))) {
-                return false;
-            }
-            if (Utils.hasProperty(_this.fileExistsCache, fullFileName)) {
-                return _this.fileExistsCache[fullFileName];
-            }
-            _this.fileExistsCacheSize++;
-            return _this.fileExistsCache[fullFileName] = _this.baseHost.fileExists(fullFileName);
-        };
-        this.compilerOptions = compilerOptions;
-        this.baseHost = ts.createCompilerHost(this.compilerOptions);
-    }
-    CachingCompilerHost.prototype.getOutput = function () {
-        return this.output;
-    };
-    CachingCompilerHost.prototype.getSourceFileImpl = function (fileName, languageVersion, onError) {
-        // Use baseHost to get the source file
-        return this.baseHost.getSourceFile(fileName, languageVersion, onError);
-    };
-    CachingCompilerHost.prototype.writeFile = function (fileName, data, writeByteOrderMark, onError) {
-        if (this.compilerOptions.compileToMemory) {
-            this.output[fileName] = data;
-        }
-        else {
-            this.baseHost.writeFile(fileName, data, writeByteOrderMark, onError);
-        }
-    };
-    CachingCompilerHost.prototype.readFile = function (fileName) {
-        if (Utils.hasProperty(this.fileReadCache, fileName)) {
-            return this.fileReadCache[fileName];
-        }
-        return this.fileReadCache[fileName] = this.baseHost.readFile(fileName);
-    };
-    // Use Typescript CompilerHost "base class" implementation..
-    CachingCompilerHost.prototype.getDefaultLibFileName = function (options) {
-        return this.baseHost.getDefaultLibFileName(options);
-    };
-    CachingCompilerHost.prototype.getCurrentDirectory = function () {
-        return this.baseHost.getCurrentDirectory();
-    };
-    CachingCompilerHost.prototype.getDirectories = function (path) {
-        return this.baseHost.getDirectories(path);
-    };
-    CachingCompilerHost.prototype.getCanonicalFileName = function (fileName) {
-        return this.baseHost.getCanonicalFileName(fileName);
-    };
-    CachingCompilerHost.prototype.useCaseSensitiveFileNames = function () {
-        return this.baseHost.useCaseSensitiveFileNames();
-    };
-    CachingCompilerHost.prototype.getNewLine = function () {
-        return this.baseHost.getNewLine();
-    };
-    CachingCompilerHost.prototype.directoryExists = function (directoryPath) {
-        if (Utils.hasProperty(this.dirExistsCache, directoryPath)) {
-            return this.dirExistsCache[directoryPath];
-        }
-        this.dirExistsCacheSize++;
-        return this.dirExistsCache[directoryPath] = ts.sys.directoryExists(directoryPath);
-    };
-    return CachingCompilerHost;
-}());
-var CompileStream = (function (_super) {
-    __extends(CompileStream, _super);
-    function CompileStream(opts) {
-        _super.call(this, { objectMode: true });
-    }
-    CompileStream.prototype._read = function () {
-        // Safely do nothing
-    };
-    return CompileStream;
-}(stream.Readable));
-var StatisticsReporter = (function () {
-    function StatisticsReporter() {
-    }
-    StatisticsReporter.prototype.reportTitle = function (name) {
-        Logger.log(name);
-    };
-    StatisticsReporter.prototype.reportValue = function (name, value) {
-        Logger.log(this.padRight(name + ":", 25) + chalk.magenta(this.padLeft(value.toString(), 10)));
-    };
-    StatisticsReporter.prototype.reportCount = function (name, count) {
-        this.reportValue(name, "" + count);
-    };
-    StatisticsReporter.prototype.reportTime = function (name, time) {
-        this.reportValue(name, (time / 1000).toFixed(2) + "s");
-    };
-    StatisticsReporter.prototype.reportPercentage = function (name, percentage) {
-        this.reportValue(name, percentage.toFixed(2) + "%");
-    };
-    StatisticsReporter.prototype.padLeft = function (s, length) {
-        while (s.length < length) {
-            s = " " + s;
-        }
-        return s;
-    };
-    StatisticsReporter.prototype.padRight = function (s, length) {
-        while (s.length < length) {
-            s = s + " ";
-        }
-        return s;
-    };
-    return StatisticsReporter;
-}());
-var TsVinylFile = (function (_super) {
-    __extends(TsVinylFile, _super);
-    function TsVinylFile(options) {
-        _super.call(this, options);
-    }
-    return TsVinylFile;
-}(File));
-var BundlePackageType;
-(function (BundlePackageType) {
-    BundlePackageType[BundlePackageType["None"] = 0] = "None";
-    BundlePackageType[BundlePackageType["Library"] = 1] = "Library";
-    BundlePackageType[BundlePackageType["Component"] = 2] = "Component";
-})(BundlePackageType || (BundlePackageType = {}));
-var BundlePackage = (function () {
-    function BundlePackage(packageType, packageNamespace) {
-        this.packageNamespace = undefined;
-        this.packageType = packageType;
-        this.packageNamespace = packageNamespace;
-    }
-    BundlePackage.prototype.getPackageType = function () {
-        return this.packageType;
-    };
-    BundlePackage.prototype.getPackageNamespace = function () {
-        return this.packageNamespace;
-    };
-    return BundlePackage;
-}());
 var BundleParser = (function () {
     function BundleParser() {
     }
@@ -491,123 +345,6 @@ var BundleParser = (function () {
     };
     return BundleParser;
 }());
-var Compiler = (function () {
-    function Compiler(compilerHost, program) {
-        this.preEmitTime = 0;
-        this.emitTime = 0;
-        this.compilerHost = compilerHost;
-        this.program = program;
-        this.compilerOptions = this.program.getCompilerOptions();
-    }
-    Compiler.prototype.compile = function () {
-        Logger.log("Compiling project files...");
-        this.preEmitTime = new Date().getTime();
-        var diagnostics = ts.getPreEmitDiagnostics(this.program);
-        if (this.compilerOptions.noEmitOnError && diagnostics.length > 0) {
-            return new CompilerResult(true, diagnostics);
-        }
-        if (this.compilerOptions.noEmit) {
-            return new CompilerResult(true, []);
-        }
-        this.preEmitTime = new Date().getTime() - this.preEmitTime;
-        // Compile the source files..
-        var startTime = new Date().getTime();
-        var emitResult = this.program.emit();
-        this.emitTime = new Date().getTime() - startTime;
-        diagnostics = diagnostics.concat(emitResult.diagnostics);
-        // If the emitter didn't emit anything, then we're done
-        if (emitResult.emitSkipped) {
-            return new CompilerResult(true, diagnostics, undefined);
-        }
-        // TODO: Decouple task
-        //// Stream the compilation output...
-        //var fileOutput = this.compilerHost.getOutput();
-        //for ( var fileName in fileOutput ) {
-        //    var fileData = fileOutput[fileName];
-        //    var tsVinylFile = new TsVinylFile( {
-        //        path: fileName,
-        //        contents: new Buffer( fileData )
-        //    });
-        //    this.compileStream.push( tsVinylFile );
-        //}
-        // The emitter emitted something, inform the caller if that happened in the presence of diagnostics.
-        if (diagnostics.length > 0) {
-            return new CompilerResult(false, diagnostics, emitResult.emittedFiles, this.compilerHost.getOutput());
-        }
-        if (this.compilerOptions.diagnostics) {
-            this.reportStatistics();
-        }
-        return new CompilerResult(false, [], emitResult.emittedFiles, this.compilerHost.getOutput());
-    };
-    Compiler.prototype.reportStatistics = function () {
-        var statisticsReporter = new StatisticsReporter();
-        statisticsReporter.reportCount("Files", this.program.getSourceFiles().length);
-        statisticsReporter.reportCount("Lines", this.compiledLines());
-        statisticsReporter.reportTime("Pre-emit time", this.preEmitTime);
-        statisticsReporter.reportTime("Emit time", this.emitTime);
-    };
-    Compiler.prototype.compiledLines = function () {
-        var _this = this;
-        var count = 0;
-        Utils.forEach(this.program.getSourceFiles(), function (file) {
-            if (!file.isDeclarationFile) {
-                count += _this.getLineStarts(file).length;
-            }
-        });
-        return count;
-    };
-    Compiler.prototype.getLineStarts = function (sourceFile) {
-        return sourceFile.getLineStarts();
-    };
-    return Compiler;
-}());
-var WatchCompilerHost = (function (_super) {
-    __extends(WatchCompilerHost, _super);
-    function WatchCompilerHost(compilerOptions, onSourceFileChanged) {
-        var _this = this;
-        _super.call(this, compilerOptions);
-        this.getSourceFile = function (fileName, languageVersion, onError) {
-            if (_this.reuseableProgram) {
-                // Use program to get source files
-                var sourceFile_1 = _this.reuseableProgram.getSourceFile(fileName);
-                // If the source file has not been modified (it has a fs watcher ) then use it            
-                if (sourceFile_1 && sourceFile_1.fileWatcher) {
-                    Logger.trace("getSourceFile() watcher hit for: ", fileName);
-                    return sourceFile_1;
-                }
-            }
-            // Use base class to get the source file
-            Logger.trace("getSourceFile() reading source file from fs: ", fileName);
-            var sourceFile = _super.prototype.getSourceFileImpl.call(_this, fileName, languageVersion, onError);
-            if (sourceFile && _this.compilerOptions.watch) {
-                sourceFile.fileWatcher = chokidar.watch(sourceFile.fileName);
-                sourceFile.fileWatcher.on("change", function (path, stats) { return _this.onSourceFileChanged(sourceFile, path, stats); });
-            }
-            return sourceFile;
-        };
-        this.onSourceFileChanged = onSourceFileChanged;
-    }
-    WatchCompilerHost.prototype.setReuseableProgram = function (program) {
-        this.reuseableProgram = program;
-    };
-    return WatchCompilerHost;
-}(CachingCompilerHost));
-var BundleResult = (function () {
-    function BundleResult(errors, bundleSource) {
-        this.errors = errors;
-        this.bundleSource = bundleSource;
-    }
-    BundleResult.prototype.getBundleSource = function () {
-        return this.bundleSource;
-    };
-    BundleResult.prototype.getErrors = function () {
-        return this.errors;
-    };
-    BundleResult.prototype.succeeded = function () {
-        return (this.errors.length == 0);
-    };
-    return BundleResult;
-}());
 var Glob = (function () {
     function Glob() {
     }
@@ -651,6 +388,54 @@ var Glob = (function () {
         return result;
     };
     return Glob;
+}());
+var StatisticsReporter = (function () {
+    function StatisticsReporter() {
+    }
+    StatisticsReporter.prototype.reportTitle = function (name) {
+        Logger.log(name);
+    };
+    StatisticsReporter.prototype.reportValue = function (name, value) {
+        Logger.log(this.padRight(name + ":", 25) + chalk.magenta(this.padLeft(value.toString(), 10)));
+    };
+    StatisticsReporter.prototype.reportCount = function (name, count) {
+        this.reportValue(name, "" + count);
+    };
+    StatisticsReporter.prototype.reportTime = function (name, time) {
+        this.reportValue(name, (time / 1000).toFixed(2) + "s");
+    };
+    StatisticsReporter.prototype.reportPercentage = function (name, percentage) {
+        this.reportValue(name, percentage.toFixed(2) + "%");
+    };
+    StatisticsReporter.prototype.padLeft = function (s, length) {
+        while (s.length < length) {
+            s = " " + s;
+        }
+        return s;
+    };
+    StatisticsReporter.prototype.padRight = function (s, length) {
+        while (s.length < length) {
+            s = s + " ";
+        }
+        return s;
+    };
+    return StatisticsReporter;
+}());
+var BundleResult = (function () {
+    function BundleResult(errors, bundleSource) {
+        this.errors = errors;
+        this.bundleSource = bundleSource;
+    }
+    BundleResult.prototype.getBundleSource = function () {
+        return this.bundleSource;
+    };
+    BundleResult.prototype.getErrors = function () {
+        return this.errors;
+    };
+    BundleResult.prototype.succeeded = function () {
+        return (this.errors.length == 0);
+    };
+    return BundleResult;
 }());
 var DependencyBuilder = (function () {
     function DependencyBuilder(host, program) {
@@ -745,1258 +530,10 @@ var DependencyBuilder = (function () {
     };
     return DependencyBuilder;
 }());
-var Ast;
-(function (Ast) {
-    (function (ContainerFlags) {
-        // The current node is not a container, and no container manipulation should happen before
-        // recursing into it.
-        ContainerFlags[ContainerFlags["None"] = 0] = "None";
-        // The current node is a container.  It should be set as the current container (and block-
-        // container) before recursing into it.  The current node does not have locals.  Examples:
-        //
-        //      Classes, ObjectLiterals, TypeLiterals, Interfaces...
-        ContainerFlags[ContainerFlags["IsContainer"] = 1] = "IsContainer";
-        // The current node is a block-scoped-container.  It should be set as the current block-
-        // container before recursing into it.  Examples:
-        //
-        //      Blocks (when not parented by functions), Catch clauses, For/For-in/For-of statements...
-        ContainerFlags[ContainerFlags["IsBlockScopedContainer"] = 2] = "IsBlockScopedContainer";
-        // The current node is the container of a control flow path. The current control flow should
-        // be saved and restored, and a new control flow initialized within the container.
-        ContainerFlags[ContainerFlags["IsControlFlowContainer"] = 4] = "IsControlFlowContainer";
-        ContainerFlags[ContainerFlags["IsFunctionLike"] = 8] = "IsFunctionLike";
-        ContainerFlags[ContainerFlags["IsFunctionExpression"] = 16] = "IsFunctionExpression";
-        ContainerFlags[ContainerFlags["HasLocals"] = 32] = "HasLocals";
-        ContainerFlags[ContainerFlags["IsInterface"] = 64] = "IsInterface";
-        ContainerFlags[ContainerFlags["IsObjectLiteralOrClassExpressionMethod"] = 128] = "IsObjectLiteralOrClassExpressionMethod";
-        // If the current node is a container that also contains locals.  Examples:
-        //
-        //      Functions, Methods, Modules, Source-files.
-        ContainerFlags[ContainerFlags["IsContainerWithLocals"] = 33] = "IsContainerWithLocals";
-    })(Ast.ContainerFlags || (Ast.ContainerFlags = {}));
-    var ContainerFlags = Ast.ContainerFlags;
-    function isPrototypeAccessAssignment(expression) {
-        if (expression.kind !== ts.SyntaxKind.BinaryExpression) {
-            return false;
-        }
-        var expr = expression;
-        if (expr.operatorToken.kind !== ts.SyntaxKind.EqualsToken || expr.left.kind !== ts.SyntaxKind.PropertyAccessExpression) {
-            return false;
-        }
-        var lhs = expr.left;
-        if (lhs.expression.kind === ts.SyntaxKind.PropertyAccessExpression) {
-            // chained dot, e.g. x.y.z = expr; this var is the 'x.y' part
-            var innerPropertyAccess = lhs.expression;
-            if (innerPropertyAccess.expression.kind === ts.SyntaxKind.Identifier && innerPropertyAccess.name.text === "prototype") {
-                return true;
-            }
-        }
-        return false;
-    }
-    Ast.isPrototypeAccessAssignment = isPrototypeAccessAssignment;
-    function isFunctionLike(node) {
-        if (node) {
-            switch (node.kind) {
-                case ts.SyntaxKind.Constructor:
-                case ts.SyntaxKind.FunctionExpression:
-                case ts.SyntaxKind.FunctionDeclaration:
-                case ts.SyntaxKind.ArrowFunction:
-                case ts.SyntaxKind.MethodDeclaration:
-                case ts.SyntaxKind.MethodSignature:
-                case ts.SyntaxKind.GetAccessor:
-                case ts.SyntaxKind.SetAccessor:
-                case ts.SyntaxKind.CallSignature:
-                case ts.SyntaxKind.ConstructSignature:
-                case ts.SyntaxKind.IndexSignature:
-                case ts.SyntaxKind.FunctionType:
-                case ts.SyntaxKind.ConstructorType:
-                    return true;
-            }
-        }
-        return false;
-    }
-    Ast.isFunctionLike = isFunctionLike;
-    function isObjectLiteralOrClassExpressionMethod(node) {
-        return node.kind === ts.SyntaxKind.MethodDeclaration &&
-            (node.parent.kind === ts.SyntaxKind.ObjectLiteralExpression || node.parent.kind === ts.SyntaxKind.ClassExpression);
-    }
-    Ast.isObjectLiteralOrClassExpressionMethod = isObjectLiteralOrClassExpressionMethod;
-    function isInterfaceInternal(symbol) {
-        if (symbol && (symbol.flags & ts.SymbolFlags.Interface)) {
-            if (symbol.valueDeclaration) {
-                var flags = symbol.valueDeclaration.flags;
-                // FUTURE: How to make interfaces internal be convention?
-                return false;
-            }
-        }
-        return false;
-    }
-    Ast.isInterfaceInternal = isInterfaceInternal;
-    function isClassInternal(symbol) {
-        if (symbol && (symbol.flags & ts.SymbolFlags.Class)) {
-            // A class always has a value declaration
-            var flags = symbol.valueDeclaration.flags;
-            // By convention, "Internal" classes are ones that are not exported.
-            if (!(flags & ts.NodeFlags.Export)) {
-                return true;
-            }
-        }
-        return false;
-    }
-    Ast.isClassInternal = isClassInternal;
-    function isClassAbstract(classSymbol) {
-        if (classSymbol && classSymbol.valueDeclaration) {
-            if (classSymbol.valueDeclaration.flags & ts.NodeFlags.Abstract) {
-                return true;
-            }
-        }
-        return false;
-    }
-    Ast.isClassAbstract = isClassAbstract;
-    function getClassHeritageProperties(classNode, checker) {
-        var classExportProperties = [];
-        function getHeritageExportProperties(heritageClause, checker) {
-            var inheritedTypeNodes = heritageClause.types;
-            if (inheritedTypeNodes) {
-                for (var _i = 0, inheritedTypeNodes_1 = inheritedTypeNodes; _i < inheritedTypeNodes_1.length; _i++) {
-                    var typeRefNode = inheritedTypeNodes_1[_i];
-                    // The "properties" of inheritedType includes all the base class/interface properties
-                    var inheritedType = checker.getTypeAtLocation(typeRefNode);
-                    var inheritedTypeDeclaration = inheritedType.symbol.valueDeclaration;
-                    if (inheritedTypeDeclaration) {
-                        var inheritedTypeHeritageClauses = inheritedTypeDeclaration.heritageClauses;
-                        if (inheritedTypeHeritageClauses) {
-                            for (var _a = 0, inheritedTypeHeritageClauses_1 = inheritedTypeHeritageClauses; _a < inheritedTypeHeritageClauses_1.length; _a++) {
-                                var inheritedTypeHeritageClause = inheritedTypeHeritageClauses_1[_a];
-                                getHeritageExportProperties(inheritedTypeHeritageClause, checker);
-                            }
-                        }
-                    }
-                    var inheritedTypeProperties = inheritedType.getProperties();
-                    for (var _b = 0, inheritedTypeProperties_1 = inheritedTypeProperties; _b < inheritedTypeProperties_1.length; _b++) {
-                        var propertySymbol = inheritedTypeProperties_1[_b];
-                        if (Ast.isExportProperty(propertySymbol)) {
-                            classExportProperties.push(propertySymbol);
-                        }
-                    }
-                }
-            }
-        }
-        var heritageClauses = classNode.heritageClauses;
-        if (heritageClauses) {
-            for (var _i = 0, heritageClauses_1 = heritageClauses; _i < heritageClauses_1.length; _i++) {
-                var heritageClause = heritageClauses_1[_i];
-                getHeritageExportProperties(heritageClause, checker);
-            }
-        }
-        return classExportProperties;
-    }
-    Ast.getClassHeritageProperties = getClassHeritageProperties;
-    function getClassAbstractProperties(extendsClause, checker) {
-        var abstractProperties = [];
-        var abstractTypeNodes = extendsClause.types;
-        for (var _i = 0, abstractTypeNodes_1 = abstractTypeNodes; _i < abstractTypeNodes_1.length; _i++) {
-            var abstractTypeNode = abstractTypeNodes_1[_i];
-            var abstractType = checker.getTypeAtLocation(abstractTypeNode);
-            var abstractTypeSymbol = abstractType.getSymbol();
-            if (abstractTypeSymbol.valueDeclaration) {
-                if (abstractTypeSymbol.valueDeclaration.flags & ts.NodeFlags.Abstract) {
-                    var props = abstractType.getProperties();
-                    for (var _a = 0, props_1 = props; _a < props_1.length; _a++) {
-                        var prop = props_1[_a];
-                        abstractProperties.push(prop);
-                    }
-                }
-            }
-        }
-        return abstractProperties;
-    }
-    Ast.getClassAbstractProperties = getClassAbstractProperties;
-    function getImplementsProperties(implementsClause, checker) {
-        var implementsProperties = [];
-        var typeNodes = implementsClause.types;
-        for (var _i = 0, typeNodes_1 = typeNodes; _i < typeNodes_1.length; _i++) {
-            var typeNode = typeNodes_1[_i];
-            var type = checker.getTypeAtLocation(typeNode);
-            var props = type.getProperties();
-            for (var _a = 0, props_2 = props; _a < props_2.length; _a++) {
-                var prop = props_2[_a];
-                implementsProperties.push(prop);
-            }
-        }
-        return implementsProperties;
-    }
-    Ast.getImplementsProperties = getImplementsProperties;
-    function getIdentifierUID(symbol) {
-        if (!symbol) {
-            return undefined;
-        }
-        var id = symbol.id;
-        // Try to get the symbol id from the identifier value declaration
-        if (id === undefined && symbol.valueDeclaration) {
-            id = symbol.valueDeclaration.symbol.id;
-        }
-        return id ? id.toString() : undefined;
-    }
-    Ast.getIdentifierUID = getIdentifierUID;
-    function getContainerFlags(node) {
-        switch (node.kind) {
-            case ts.SyntaxKind.ClassExpression:
-            case ts.SyntaxKind.ClassDeclaration:
-            case ts.SyntaxKind.EnumDeclaration:
-            case ts.SyntaxKind.ObjectLiteralExpression:
-            case ts.SyntaxKind.TypeLiteral:
-            case ts.SyntaxKind.JSDocTypeLiteral:
-            case ts.SyntaxKind.JSDocRecordType:
-                return 1 /* IsContainer */;
-            case ts.SyntaxKind.InterfaceDeclaration:
-                return 1 /* IsContainer */ | 64 /* IsInterface */;
-            case ts.SyntaxKind.JSDocFunctionType:
-            case ts.SyntaxKind.ModuleDeclaration:
-            case ts.SyntaxKind.TypeAliasDeclaration:
-                return 1 /* IsContainer */ | 32 /* HasLocals */;
-            case ts.SyntaxKind.SourceFile:
-                return 1 /* IsContainer */ | 4 /* IsControlFlowContainer */ | 32 /* HasLocals */;
-            case ts.SyntaxKind.MethodDeclaration:
-                if (isObjectLiteralOrClassExpressionMethod(node)) {
-                    return 1 /* IsContainer */ | 4 /* IsControlFlowContainer */ | 32 /* HasLocals */ | 8 /* IsFunctionLike */ | 128 /* IsObjectLiteralOrClassExpressionMethod */;
-                }
-            case ts.SyntaxKind.Constructor:
-            case ts.SyntaxKind.FunctionDeclaration:
-            case ts.SyntaxKind.MethodSignature:
-            case ts.SyntaxKind.GetAccessor:
-            case ts.SyntaxKind.SetAccessor:
-            case ts.SyntaxKind.CallSignature:
-            case ts.SyntaxKind.ConstructSignature:
-            case ts.SyntaxKind.IndexSignature:
-            case ts.SyntaxKind.FunctionType:
-            case ts.SyntaxKind.ConstructorType:
-                return 1 /* IsContainer */ | 4 /* IsControlFlowContainer */ | 32 /* HasLocals */ | 8 /* IsFunctionLike */;
-            case ts.SyntaxKind.FunctionExpression:
-            case ts.SyntaxKind.ArrowFunction:
-                return 1 /* IsContainer */ | 4 /* IsControlFlowContainer */ | 32 /* HasLocals */ | 8 /* IsFunctionLike */ | 16 /* IsFunctionExpression */;
-            case ts.SyntaxKind.ModuleBlock:
-                return 4 /* IsControlFlowContainer */;
-            case ts.SyntaxKind.PropertyDeclaration:
-                return node.initializer ? 4 /* IsControlFlowContainer */ : 0;
-            case ts.SyntaxKind.CatchClause:
-            case ts.SyntaxKind.ForStatement:
-            case ts.SyntaxKind.ForInStatement:
-            case ts.SyntaxKind.ForOfStatement:
-            case ts.SyntaxKind.CaseBlock:
-                return 2 /* IsBlockScopedContainer */;
-            case ts.SyntaxKind.Block:
-                // do not treat blocks directly inside a function as a block-scoped-container.
-                // Locals that reside in this block should go to the function locals. Othewise 'x'
-                // would not appear to be a redeclaration of a block scoped local in the following
-                // example:
-                //
-                //      function foo() {
-                //          var x;
-                //          let x;
-                //      }
-                //
-                // If we placed 'var x' into the function locals and 'let x' into the locals of
-                // the block, then there would be no collision.
-                //
-                // By not creating a new block-scoped-container here, we ensure that both 'var x'
-                // and 'let x' go into the Function-container's locals, and we do get a collision
-                // conflict.
-                return isFunctionLike(node.parent) ? 0 /* None */ : 2 /* IsBlockScopedContainer */;
-        }
-        return 0 /* None */;
-    }
-    Ast.getContainerFlags = getContainerFlags;
-    function getImplementsClause(node) {
-        if (node) {
-            var heritageClauses = node.heritageClauses;
-            if (heritageClauses) {
-                for (var _i = 0, heritageClauses_2 = heritageClauses; _i < heritageClauses_2.length; _i++) {
-                    var clause = heritageClauses_2[_i];
-                    if (clause.token === ts.SyntaxKind.ImplementsKeyword) {
-                        return clause;
-                    }
-                }
-            }
-        }
-        return undefined;
-    }
-    Ast.getImplementsClause = getImplementsClause;
-    function getExtendsClause(node) {
-        if (node) {
-            var heritageClauses = node.heritageClauses;
-            if (heritageClauses) {
-                for (var _i = 0, heritageClauses_3 = heritageClauses; _i < heritageClauses_3.length; _i++) {
-                    var clause = heritageClauses_3[_i];
-                    if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
-                        return clause;
-                    }
-                }
-            }
-        }
-        return undefined;
-    }
-    Ast.getExtendsClause = getExtendsClause;
-    function isKeyword(token) {
-        return ts.SyntaxKind.FirstKeyword <= token && token <= ts.SyntaxKind.LastKeyword;
-    }
-    Ast.isKeyword = isKeyword;
-    function isPuncuation(token) {
-        return ts.SyntaxKind.FirstPunctuation <= token && token <= ts.SyntaxKind.LastPunctuation;
-    }
-    Ast.isPuncuation = isPuncuation;
-    function isTrivia(token) {
-        return ts.SyntaxKind.FirstTriviaToken <= token && token <= ts.SyntaxKind.LastTriviaToken;
-    }
-    Ast.isTrivia = isTrivia;
-    function isExportProperty(propertySymbol) {
-        var node = propertySymbol.valueDeclaration;
-        while (node) {
-            if (node.flags & ts.NodeFlags.ExportContext) {
-                return true;
-            }
-            node = node.parent;
-        }
-        return false;
-    }
-    Ast.isExportProperty = isExportProperty;
-    function isAmbientProperty(propertySymbol) {
-        var node = propertySymbol.valueDeclaration;
-        while (node) {
-            if (node.flags & ts.NodeFlags.Ambient) {
-                return true;
-            }
-            node = node.parent;
-        }
-        return false;
-    }
-    Ast.isAmbientProperty = isAmbientProperty;
-})(Ast || (Ast = {}));
-var IdentifierInfo = (function () {
-    function IdentifierInfo(identifier, symbol, container) {
-        this.containers = {};
-        this.identifiers = [];
-        this.shortenedName = undefined;
-        this.identifier = identifier;
-        this.symbol = symbol;
-        this.identifiers = [identifier];
-        this.containers[container.getId().toString()] = container;
-    }
-    IdentifierInfo.prototype.getSymbol = function () {
-        return this.symbol;
-    };
-    IdentifierInfo.prototype.getName = function () {
-        return this.symbol.name;
-    };
-    IdentifierInfo.prototype.getId = function () {
-        var id = this.symbol.id;
-        if (id === undefined && this.symbol.valueDeclaration) {
-            id = this.symbol.valueDeclaration.symbol.id;
-        }
-        return id ? id.toString() : undefined;
-    };
-    IdentifierInfo.prototype.getContainers = function () {
-        return this.containers;
-    };
-    IdentifierInfo.prototype.getIdentifiers = function () {
-        return this.identifiers;
-    };
-    IdentifierInfo.prototype.addRef = function (identifier, container) {
-        // Add the identifier (node) reference
-        this.identifiers.push(identifier);
-        // We only need to keep track of a single reference in a container
-        if (!Utils.hasProperty(this.containers, container.getId().toString())) {
-            this.containers[container.getId().toString()] = container;
-        }
-    };
-    IdentifierInfo.prototype.isNamespaceImportAlias = function () {
-        if ((this.symbol.flags & ts.SymbolFlags.Alias) > 0) {
-            if (this.symbol.declarations[0].kind === ts.SyntaxKind.NamespaceImport) {
-                return true;
-            }
-        }
-        return false;
-    };
-    IdentifierInfo.prototype.isFunctionScopedVariable = function () {
-        if ((this.symbol.flags & ts.SymbolFlags.FunctionScopedVariable) > 0) {
-            var variableDeclaration = this.getVariableDeclaration();
-            if (variableDeclaration) {
-                return true;
-            }
-        }
-        return false;
-    };
-    IdentifierInfo.prototype.isBlockScopedVariable = function () {
-        if ((this.symbol.flags & ts.SymbolFlags.BlockScopedVariable) > 0) {
-            var variableDeclaration = this.getVariableDeclaration();
-            if (variableDeclaration) {
-                return ((variableDeclaration.parent.flags & ts.NodeFlags.Let) !== 0) ||
-                    ((variableDeclaration.parent.flags & ts.NodeFlags.Const) !== 0);
-            }
-        }
-        return false;
-    };
-    IdentifierInfo.prototype.isParameter = function () {
-        // Note: FunctionScopedVariable also indicates a parameter
-        if ((this.symbol.flags & ts.SymbolFlags.FunctionScopedVariable) > 0) {
-            // A parameter has a value declaration
-            if (this.symbol.valueDeclaration.kind === ts.SyntaxKind.Parameter) {
-                return true;
-            }
-        }
-        return false;
-    };
-    IdentifierInfo.prototype.isInternalClass = function () {
-        // TJT: Review - should use the same export "override" logic as in isInternalFunction
-        return Ast.isClassInternal(this.symbol);
-    };
-    IdentifierInfo.prototype.isInternalInterface = function () {
-        return Ast.isInterfaceInternal(this.symbol);
-    };
-    IdentifierInfo.prototype.isInternalFunction = function (packageNamespace) {
-        if (this.symbol.flags & ts.SymbolFlags.Function) {
-            // A function has a value declaration
-            if (this.symbol.valueDeclaration.kind === ts.SyntaxKind.FunctionDeclaration) {
-                var flags = this.symbol.valueDeclaration.flags;
-                // If The function is from an extern API or ambient then it cannot be considered internal.
-                if (Ast.isExportProperty(this.symbol) || Ast.isAmbientProperty(this.symbol)) {
-                    return false;
-                }
-                if (!(flags & ts.NodeFlags.Export)) {
-                    return true;
-                }
-                // Override export flag if function is not in our special package namespace.
-                if (packageNamespace) {
-                    var node = this.symbol.valueDeclaration;
-                    while (node) {
-                        if (node.flags & ts.NodeFlags.Namespace) {
-                            var nodeNamespaceName = node.name.text;
-                            if (nodeNamespaceName !== packageNamespace) {
-                                return true;
-                            }
-                        }
-                        node = node.parent;
-                    }
-                }
-            }
-        }
-        return false;
-    };
-    IdentifierInfo.prototype.isPrivateMethod = function () {
-        if ((this.symbol.flags & ts.SymbolFlags.Method) > 0) {
-            // We explicitly check that a method has a value declaration.
-            if (this.symbol.valueDeclaration === undefined) {
-                return false;
-            }
-            var flags = this.symbol.valueDeclaration.flags;
-            if ((flags & ts.NodeFlags.Private) > 0) {
-                return true;
-            }
-            // Check if the method parent class or interface is "internal" ( non-private methods may be shortened too )
-            var parent_1 = this.symbol.parent;
-            if (parent_1 && Ast.isClassInternal(parent_1)) {
-                // TJT: Review - public methods of abstact classes are not shortened.
-                if (!Ast.isClassAbstract(parent_1)) {
-                    return true;
-                }
-            }
-            if (parent_1 && Ast.isInterfaceInternal(parent_1)) {
-                // TODO: Interfaces methods are always external for now.
-                return false;
-            }
-        }
-        return false;
-    };
-    IdentifierInfo.prototype.isPrivateProperty = function () {
-        if ((this.symbol.flags & ts.SymbolFlags.Property) > 0) {
-            // A property has a value declaration except when it is the "prototype" property.
-            if (this.symbol.valueDeclaration === undefined) {
-                return false;
-            }
-            var flags = this.symbol.valueDeclaration.flags;
-            if ((flags & ts.NodeFlags.Private) > 0) {
-                return true;
-            }
-            // Check if the property parent class is "internal" ( non-private properties may be shortened too )
-            var parent_2 = this.symbol.parent;
-            if (parent_2 && Ast.isClassInternal(parent_2)) {
-                // TJT: Review - public properties of abstact classes are not shortened.
-                if (!Ast.isClassAbstract(parent_2)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    };
-    IdentifierInfo.prototype.getVariableDeclaration = function () {
-        switch (this.identifier.parent.kind) {
-            case ts.SyntaxKind.VariableDeclaration:
-                return this.identifier.parent;
-            case ts.SyntaxKind.VariableDeclarationList:
-                Logger.warn("VariableDeclaratioList in getVariableDeclaration() - returning null");
-                break;
-            case ts.SyntaxKind.VariableStatement:
-                Logger.warn("VariableStatement in getVariableDeclaration() - returning null");
-                break;
-        }
-        return null;
-    };
-    return IdentifierInfo;
-}());
-var ContainerIdGenerator = (function () {
-    function ContainerIdGenerator() {
-    }
-    ContainerIdGenerator.getNextId = function () {
-        return this.nextId++;
-    };
-    ContainerIdGenerator.nextId = 1;
-    return ContainerIdGenerator;
-}());
-var Container = (function () {
-    function Container(node, containerFlags, parentContainer) {
-        this.childContainers = [];
-        // The base class cannot be determined by the checker if the base class name has been shortened
-        // so we use get and set for the baseClass property
-        this.baseClass = undefined;
-        this.namesExcluded = {};
-        this.localIdentifiers = {};
-        this.classifiableSymbols = {};
-        this.excludedIdentifiers = {};
-        this.excludedProperties = [];
-        this.shortenedIdentifierCount = 0;
-        this.id = ContainerIdGenerator.getNextId();
-        this.containerFlags = containerFlags;
-        if (containerFlags & 2 /* IsBlockScopedContainer */) {
-            this.blockScopeContainer = node;
-            this.isBlockScope = true;
-            // A block scoped container's parent is the parent function scope container.
-            this.parent = parentContainer.getParent();
-        }
-        else {
-            this.container = this.blockScopeContainer = node;
-            this.isBlockScope = false;
-            // A function scoped container is it's own parent
-            this.parent = this;
-        }
-        // The name generator index starts at 0 for containers 
-        this.nameIndex = 0;
-    }
-    Container.prototype.getId = function () {
-        return this.id;
-    };
-    Container.prototype.addChildContainer = function (container) {
-        this.childContainers.push(container);
-    };
-    Container.prototype.getChildren = function () {
-        return this.childContainers;
-    };
-    Container.prototype.getParent = function () {
-        return this.parent;
-    };
-    Container.prototype.getNameIndex = function () {
-        // TJT: This logic needs to be reviewed for applicability to ES6 block scopes
-        if (this.isBlockScope) {
-            // The name generator index for block scoped containers is obtained from the parent container
-            return this.parent.getNameIndex();
-        }
-        return this.nameIndex++;
-    };
-    Container.prototype.getNode = function () {
-        return this.isBlockScope ? this.blockScopeContainer : this.container;
-    };
-    Container.prototype.getMembers = function () {
-        if (this.container) {
-            switch (this.container.kind) {
-                case ts.SyntaxKind.ClassDeclaration:
-                    return this.container.members;
-                case ts.SyntaxKind.EnumDeclaration:
-                    return this.container.members;
-                default:
-                    Logger.trace("Container::getMembers() unprocessed container kind: ", this.container.kind);
-            }
-        }
-        return undefined;
-    };
-    Container.prototype.getLocals = function () {
-        if (this.container && this.containerFlags & 32 /* HasLocals */) {
-            switch (this.container.kind) {
-                case ts.SyntaxKind.ModuleDeclaration:
-                    return this.container.locals;
-                default:
-                    Logger.warn("Container::getLocals() unprocessed container kind: ", this.container.kind);
-            }
-        }
-        return undefined;
-    };
-    Container.prototype.isBlockScoped = function () {
-        return this.isBlockScope;
-    };
-    Container.prototype.isFunctionScoped = function () {
-        if (this.containerFlags & (1 /* IsContainer */ | 33 /* IsContainerWithLocals */)) {
-            return true;
-        }
-        return false;
-    };
-    Container.prototype.setBaseClass = function (baseClass) {
-        if (baseClass.flags & ts.SymbolFlags.Class) {
-            this.baseClass = baseClass;
-        }
-    };
-    Container.prototype.getBaseClass = function () {
-        return this.baseClass;
-    };
-    Container.prototype.hasChild = function (container) {
-        for (var i = 0; i < this.childContainers.length; i++) {
-            if (container.getId() === this.childContainers[i].getId())
-                return true;
-        }
-        return false;
-    };
-    return Container;
-}());
-var NodeWalker = (function () {
-    function NodeWalker() {
-    }
-    NodeWalker.prototype.walk = function (node) {
-        this.visitNode(node);
-    };
-    NodeWalker.prototype.visitNode = function (node) {
-        this.walkChildren(node);
-    };
-    NodeWalker.prototype.walkChildren = function (node) {
-        var _this = this;
-        ts.forEachChild(node, function (child) { return _this.visitNode(child); });
-    };
-    return NodeWalker;
-}());
-var NameGenerator = (function () {
-    function NameGenerator() {
-        // Base64 char set: 26 lowercase letters + 26 uppercase letters + '$' + '_' + 10 digits                                          
-        this.base64Chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ$_0123456789";
-    }
-    NameGenerator.prototype.getName = function (index) {
-        // 2 and 3 letter reserved words that cannot be used in identifier names
-        var RESERVED_KEYWORDS = ["do", "if", "in", "for", "int", "let", "new", "try", "var"];
-        var name;
-        while (true) {
-            name = this.generateName(index++);
-            if (RESERVED_KEYWORDS.indexOf(name) > 0) {
-                continue;
-            }
-            else {
-                return name;
-            }
-        }
-    };
-    NameGenerator.prototype.generateName = function (index) {
-        var id = index;
-        // The first 54 chars of the base64 char set are used for the first char of the identifier
-        var name = this.base64Chars[id % 54];
-        id = Math.floor(id / 54);
-        while (id > 0) {
-            // The full base64 char set is used after the first char of the identifier
-            name += this.base64Chars[id % 64];
-            id = Math.floor(id / 64);
-        }
-        return name;
-    };
-    return NameGenerator;
-}());
-var Debug;
-(function (Debug) {
-    function assert(condition, message) {
-        if (!condition) {
-            message = message || "Assertion failed";
-            if (typeof Error !== "undefined") {
-                throw new Error(message);
-            }
-            throw message;
-        }
-    }
-    Debug.assert = assert;
-})(Debug || (Debug = {}));
-var BundleMinifier = (function (_super) {
-    __extends(BundleMinifier, _super);
-    function BundleMinifier(program, compilerOptions, bundleConfig) {
-        _super.call(this);
-        this.containerStack = [];
-        this.classifiableContainers = {};
-        this.allIdentifierInfos = {};
-        this.identifierCount = 0;
-        this.shortenedIdentifierCount = 0;
-        this.program = program;
-        this.checker = program.getTypeChecker();
-        this.compilerOptions = compilerOptions;
-        this.bundleConfig = bundleConfig;
-        this.containerStack = [];
-        this.nameGenerator = new NameGenerator();
-    }
-    BundleMinifier.prototype.transform = function (bundleSourceFile) {
-        this.bundleSourceFile = bundleSourceFile;
-        return this.minify(bundleSourceFile);
-    };
-    BundleMinifier.prototype.removeWhitespace = function (jsContents) {
-        // ES6 whitespace rules..
-        // Special Cases..
-        // break, continue, function: space right if next token is [Expression]
-        // return, yield: space if next token is not a semicolon
-        // else:
-        // Space to left and right of keyword..
-        // extends, in, instanceof : space left and right
-        // Space to the right of the keyword..
-        // case, class, const, delete, do, export, get, import, let, new, set, static, throw, typeof, var, void
-        // Space not required..
-        // catch, debugger, default, finally, for, if, super, switch, this, try, while, with
-        // Notes..
-        // export: Not supported yet? For now add space
-        // default: When used with export?
-        this.whiteSpaceTime = new Date().getTime();
-        this.whiteSpaceBefore = jsContents.length;
-        var output = "";
-        var lastNonTriviaToken = ts.SyntaxKind.Unknown;
-        var isTrivia = false;
-        var token;
-        var scanner = ts.createScanner(ts.ScriptTarget.ES5, /* skipTrivia */ false, ts.LanguageVariant.Standard, jsContents);
-        while ((token = scanner.scan()) !== ts.SyntaxKind.EndOfFileToken) {
-            isTrivia = false;
-            if (Ast.isTrivia(token)) {
-                // TJT: Uncomment to add new line trivia to output for testing purposes
-                //if ( token === ts.SyntaxKind.NewLineTrivia ) {
-                //    output += scanner.getTokenText();
-                //}
-                isTrivia = true;
-            }
-            if (!isTrivia) {
-                // Process the last non trivia token
-                switch (lastNonTriviaToken) {
-                    case ts.SyntaxKind.FunctionKeyword:
-                        // Space required after function keyword if next token is an identifier
-                        if (token === ts.SyntaxKind.Identifier) {
-                            output += " ";
-                        }
-                        break;
-                    case ts.SyntaxKind.BreakKeyword:
-                    case ts.SyntaxKind.ContinueKeyword:
-                    case ts.SyntaxKind.ReturnKeyword:
-                    case ts.SyntaxKind.YieldKeyword:
-                        // Space not required after return keyword if the current token is a semicolon
-                        if (token !== ts.SyntaxKind.SemicolonToken) {
-                            output += " ";
-                        }
-                        break;
-                    case ts.SyntaxKind.ElseKeyword:
-                        // Space not required after return keyword if the current token is a punctuation
-                        if (token !== ts.SyntaxKind.OpenBraceToken) {
-                            output += " ";
-                        }
-                        break;
-                }
-                // Process the current token..
-                switch (token) {
-                    // Keywords that require a right space
-                    case ts.SyntaxKind.CaseKeyword:
-                    case ts.SyntaxKind.ClassKeyword:
-                    case ts.SyntaxKind.ConstKeyword:
-                    case ts.SyntaxKind.DeleteKeyword:
-                    case ts.SyntaxKind.DoKeyword:
-                    case ts.SyntaxKind.ExportKeyword: // TJT: Add a space just to be sure right now 
-                    case ts.SyntaxKind.GetKeyword:
-                    case ts.SyntaxKind.ImportKeyword:
-                    case ts.SyntaxKind.LetKeyword:
-                    case ts.SyntaxKind.NewKeyword:
-                    case ts.SyntaxKind.SetKeyword:
-                    case ts.SyntaxKind.StaticKeyword:
-                    case ts.SyntaxKind.ThrowKeyword:
-                    case ts.SyntaxKind.TypeOfKeyword:
-                    case ts.SyntaxKind.VarKeyword:
-                    case ts.SyntaxKind.VoidKeyword:
-                        output += scanner.getTokenText() + " ";
-                        break;
-                    // Keywords that require space left and right..
-                    case ts.SyntaxKind.ExtendsKeyword:
-                    case ts.SyntaxKind.InKeyword:
-                    case ts.SyntaxKind.InstanceOfKeyword:
-                        output += " " + scanner.getTokenText() + " ";
-                        break;
-                    // Avoid concatenations of ++, + and --, - operators
-                    case ts.SyntaxKind.PlusToken:
-                    case ts.SyntaxKind.PlusPlusToken:
-                        if ((lastNonTriviaToken === ts.SyntaxKind.PlusToken) ||
-                            (lastNonTriviaToken === ts.SyntaxKind.PlusPlusToken)) {
-                            output += " ";
-                        }
-                        output += scanner.getTokenText();
-                        break;
-                    case ts.SyntaxKind.MinusToken:
-                    case ts.SyntaxKind.MinusMinusToken:
-                        if ((lastNonTriviaToken === ts.SyntaxKind.MinusToken) ||
-                            (lastNonTriviaToken === ts.SyntaxKind.MinusMinusToken)) {
-                            output += " ";
-                        }
-                        output += scanner.getTokenText();
-                        break;
-                    default:
-                        // All other tokens can be output. Keywords that do not require whitespace.
-                        output += scanner.getTokenText();
-                        break;
-                }
-            }
-            if (!isTrivia) {
-                lastNonTriviaToken = token;
-            }
-        }
-        this.whiteSpaceAfter = output.length;
-        this.whiteSpaceTime = new Date().getTime() - this.whiteSpaceTime;
-        if (this.compilerOptions.diagnostics)
-            this.reportWhitespaceStatistics();
-        return output;
-    };
-    BundleMinifier.prototype.visitNode = function (node) {
-        // Traverse nodes to build containers and process all identifiers nodes.
-        if (this.isNextContainer(node)) {
-            _super.prototype.visitNode.call(this, node);
-            this.restoreContainer();
-        }
-        else {
-            switch (node.kind) {
-                case ts.SyntaxKind.Identifier:
-                    var identifier = node;
-                    var identifierSymbol = this.checker.getSymbolAtLocation(identifier);
-                    // The identifierSymbol may be null when an identifier is accessed within a function that
-                    // has been assigned to the prototype property of an object. We check for this here.
-                    if (!identifierSymbol) {
-                        identifierSymbol = this.getSymbolFromPrototypeFunction(identifier);
-                    }
-                    if (identifierSymbol) {
-                        var identifierUID = Ast.getIdentifierUID(identifierSymbol);
-                        if (identifierUID === undefined) {
-                            if (identifierSymbol.flags & ts.SymbolFlags.Transient) {
-                                // TJT: Can we ignore all transient symbols?
-                                Logger.trace("Ignoring transient symbol: ", identifierSymbol.name);
-                                break;
-                            }
-                            else {
-                                identifierUID = ts.getSymbolId(identifierSymbol).toString();
-                                Logger.trace("Generated symbol id for: ", identifierSymbol.name, identifierUID);
-                            }
-                        }
-                        // Check to see if we've seen this identifer symbol before
-                        if (Utils.hasProperty(this.allIdentifierInfos, identifierUID)) {
-                            Logger.info("Identifier already added: ", identifierSymbol.name, identifierUID);
-                            // If we have, then add it to the identifier info references 
-                            var prevAddedIdentifier = this.allIdentifierInfos[identifierUID];
-                            this.allIdentifierInfos[identifierUID].addRef(identifier, this.currentContainer());
-                            // If the previously added identifier is not in the current container's local identifier table then
-                            // it must be excluded so that it's shortened name will not be used in this container.
-                            if (!Utils.hasProperty(this.currentContainer().localIdentifiers, identifierUID)) {
-                                this.currentContainer().excludedIdentifiers[identifierUID] = prevAddedIdentifier;
-                            }
-                        }
-                        else {
-                            var identifierInfo = new IdentifierInfo(identifier, identifierSymbol, this.currentContainer());
-                            Logger.info("Adding new identifier: ", identifierInfo.getName(), identifierInfo.getId());
-                            // Add the new identifier info to both the container and the all list
-                            this.currentContainer().localIdentifiers[identifierUID] = identifierInfo;
-                            this.allIdentifierInfos[identifierUID] = identifierInfo;
-                            // We can't shorten identifier names that are 1 character in length AND
-                            // we can't risk the chance that an identifier name will be replaced with a 2 char
-                            // shortened name due to the constraint that the names are changed in place
-                            var identifierName = identifierSymbol.getName();
-                            if (identifierName.length === 1) {
-                                identifierInfo.shortenedName = identifierName;
-                                this.currentContainer().excludedIdentifiers[identifierUID] = identifierInfo;
-                            }
-                            this.identifierCount++;
-                        }
-                    }
-                    else {
-                        Logger.warn("Identifier does not have a symbol: ", identifier.text);
-                    }
-                    break;
-            }
-            _super.prototype.visitNode.call(this, node);
-        }
-    };
-    BundleMinifier.prototype.getSymbolFromPrototypeFunction = function (identifier) {
-        var containerNode = this.currentContainer().getNode();
-        if (containerNode.kind === ts.SyntaxKind.FunctionExpression) {
-            if (Ast.isPrototypeAccessAssignment(containerNode.parent)) {
-                // Get the 'x' of 'x.prototype.y = f' (here, 'f' is 'container')
-                var className = containerNode.parent // x.prototype.y = f
-                    .left // x.prototype.y
-                    .expression // x.prototype
-                    .expression; // x
-                var classSymbol = this.checker.getSymbolAtLocation(className);
-                if (classSymbol && classSymbol.members) {
-                    if (Utils.hasProperty(classSymbol.members, identifier.text)) {
-                        Logger.info("Symbol obtained from prototype function: ", identifier.text);
-                        return classSymbol.members[identifier.text];
-                    }
-                }
-            }
-        }
-        return undefined;
-    };
-    BundleMinifier.prototype.minify = function (sourceFile) {
-        this.transformTime = new Date().getTime();
-        // Walk the sourceFile to build containers and the identifiers within. 
-        this.walk(sourceFile);
-        this.shortenIdentifiers();
-        this.transformTime = new Date().getTime() - this.transformTime;
-        if (this.compilerOptions.diagnostics)
-            this.reportMinifyStatistics();
-        return sourceFile;
-    };
-    BundleMinifier.prototype.shortenIdentifiers = function () {
-        // NOTE: Once identifier names are shortened, the typescript checker cannot be used. 
-        // We first need to process all the class containers to determine which properties cannot be shortened 
-        // ( if they are declared externally ).
-        for (var classContainerKey in this.classifiableContainers) {
-            var classContainer = this.classifiableContainers[classContainerKey];
-            var abstractProperties = [];
-            var heritageProperties = [];
-            var implementsProperties = [];
-            var extendsClause = Ast.getExtendsClause(classContainer.getNode());
-            if (extendsClause) {
-                // Check for abstract properties...
-                // TODO: Abstract properties are currently not shortened, but they could possibly be.
-                //       The child class that implements a parent class property would need to have the same shortened name.
-                abstractProperties = Ast.getClassAbstractProperties(extendsClause, this.checker);
-            }
-            var implementsClause = Ast.getImplementsClause(classContainer.getNode());
-            if (implementsClause) {
-                implementsProperties = Ast.getImplementsProperties(implementsClause, this.checker);
-            }
-            heritageProperties = Ast.getClassHeritageProperties(classContainer.getNode(), this.checker);
-            // Join the abstract and implements properties
-            var excludedProperties = heritageProperties.concat(abstractProperties, implementsProperties);
-            classContainer.excludedProperties = excludedProperties;
-        }
-        // Recursively process the container identifiers starting at the source file container...
-        this.shortenContainerIdentifiers(this.sourceFileContainer);
-    };
-    BundleMinifier.prototype.shortenContainerIdentifiers = function (container) {
-        // If this container extends a base/parent class then we must make sure we have processed the base/parent class members
-        var baseClass = container.getBaseClass();
-        if (baseClass) {
-            // We need to get the container for the parent/base class
-            var baseClassContainer = this.classifiableContainers[baseClass.name];
-            if (baseClassContainer) {
-                var baseClassMembers = baseClassContainer.getMembers();
-                if (baseClassMembers) {
-                    this.processClassMembers(baseClassMembers, baseClassContainer);
-                }
-            }
-        }
-        // Determine the names which cannot be used as shortened names in this container.
-        this.excludeNames(container);
-        // Process container members..
-        var containerClassMembers = container.getMembers();
-        if (containerClassMembers) {
-            this.processClassMembers(containerClassMembers, container);
-        }
-        // Process container locals..
-        var containerLocals = container.getLocals();
-        if (containerLocals) {
-            this.processContainerLocals(containerLocals, container);
-        }
-        // Process the containers identifiers...
-        for (var identifierTableKey in container.localIdentifiers) {
-            var identifierInfo = container.localIdentifiers[identifierTableKey];
-            this.processIdentifierInfo(identifierInfo, container);
-        }
-        // Process the containers classifiables...
-        // TJT: Review..
-        for (var classifiableKey in container.classifiableSymbols) {
-            var classSymbol = container.classifiableSymbols[classifiableKey];
-            var classSymbolUId = Ast.getIdentifierUID(classSymbol);
-            var classIdentifierInfo = this.allIdentifierInfos[classSymbolUId];
-            this.processIdentifierInfo(classIdentifierInfo, container);
-        }
-        // Recursively go through container children in order added
-        var containerChildren = container.getChildren();
-        for (var j = 0; j < containerChildren.length; j++) {
-            this.shortenContainerIdentifiers(containerChildren[j]);
-        }
-    };
-    BundleMinifier.prototype.processIdentifierInfo = function (identifierInfo, container) {
-        var _this = this;
-        if (this.canShortenIdentifier(identifierInfo)) {
-            var shortenedName_1 = this.getShortenedIdentifierName(container, identifierInfo);
-            Logger.trace("Identifier shortened: ", identifierInfo.getName(), shortenedName_1);
-            // Add the shortened name to the excluded names in each container that this identifier was found in.
-            var containerRefs = identifierInfo.getContainers();
-            for (var containerKey in containerRefs) {
-                var containerRef = containerRefs[containerKey];
-                containerRef.namesExcluded[shortenedName_1] = true;
-            }
-            // Change all referenced identifier nodes to the shortened name
-            Utils.forEach(identifierInfo.getIdentifiers(), function (identifier) {
-                _this.setIdentifierText(identifier, shortenedName_1);
-            });
-            return;
-        }
-    };
-    BundleMinifier.prototype.canShortenIdentifier = function (identifierInfo) {
-        if (identifierInfo.isBlockScopedVariable() ||
-            identifierInfo.isFunctionScopedVariable() ||
-            identifierInfo.isInternalClass() ||
-            identifierInfo.isInternalInterface() ||
-            identifierInfo.isPrivateMethod() ||
-            identifierInfo.isPrivateProperty() ||
-            identifierInfo.isInternalFunction(this.bundleConfig.package.getPackageNamespace()) ||
-            identifierInfo.isParameter() ||
-            identifierInfo.isNamespaceImportAlias()) {
-            Logger.trace("Identifier CAN be shortened: ", identifierInfo.getName());
-            return true;
-        }
-        Logger.trace("Identifier CANNOT be shortened: ", identifierInfo.getName());
-        return false;
-    };
-    BundleMinifier.prototype.getShortenedIdentifierName = function (container, identifierInfo) {
-        // Identifier names are shortened in place. They must be the same length or smaller than the original name.
-        if (!identifierInfo.shortenedName) {
-            var identifierName = identifierInfo.getName();
-            if (identifierName.length === 1) {
-                // Just reuse the original name for 1 char names
-                identifierInfo.shortenedName = identifierName;
-            }
-            else {
-                // Loop until we have a valid shortened name
-                // The shortened name MUST be the same length or less
-                while (true) {
-                    var shortenedName = this.nameGenerator.getName(container.getNameIndex());
-                    Debug.assert(shortenedName.length <= identifierName.length);
-                    if (!Utils.hasProperty(container.namesExcluded, shortenedName)) {
-                        identifierInfo.shortenedName = shortenedName;
-                        break;
-                    }
-                    else {
-                        Logger.trace("Generated name was excluded: ", shortenedName, identifierName);
-                    }
-                }
-                this.shortenedIdentifierCount++;
-            }
-        }
-        else {
-            Logger.trace("Identifier already has shortened name: ", identifierInfo.getName(), identifierInfo.shortenedName);
-        }
-        Logger.info("Identifier shortened name: ", identifierInfo.getName(), identifierInfo.shortenedName);
-        return identifierInfo.shortenedName;
-    };
-    BundleMinifier.prototype.setIdentifierText = function (identifier, text) {
-        var identifierLength = identifier.text.length;
-        var bufferLength = (identifier.end - identifier.pos);
-        // Check to see if there is leading trivia
-        var triviaOffset = identifier.getLeadingTriviaWidth();
-        // Find the start of the identifier text within the identifier character array
-        for (var identifierStart = identifier.pos + triviaOffset; identifierStart < identifier.pos + bufferLength; identifierStart++) {
-            if (this.bundleSourceFile.text[identifierStart] === identifier.text[0])
-                break;
-        }
-        // Replace the identifier text
-        identifier.text = text;
-        identifier.end = identifierStart + text.length;
-        for (var i = 0; i < identifierLength; i++) {
-            var replaceChar = " ";
-            if (i < text.length) {
-                replaceChar = text[i];
-            }
-            this.bundleSourceFile.text = Utils.replaceAt(this.bundleSourceFile.text, identifierStart + i, replaceChar);
-        }
-    };
-    BundleMinifier.prototype.processContainerLocals = function (locals, container) {
-        for (var localsKey in locals) {
-            var local = locals[localsKey];
-            var localSymbolUId = Ast.getIdentifierUID(local.declarations[0].symbol);
-            if (localSymbolUId) {
-                var localIdentifierInfo = this.allIdentifierInfos[localSymbolUId];
-                this.processIdentifierInfo(localIdentifierInfo, container);
-            }
-            else {
-                Logger.warn("Container local does not have a UId");
-            }
-        }
-    };
-    BundleMinifier.prototype.processClassMembers = function (members, container) {
-        for (var memberKey in members) {
-            var member = members[memberKey];
-            var memberSymbol = member.symbol;
-            if (memberSymbol) {
-                var memberSymbolUId = Ast.getIdentifierUID(memberSymbol);
-                if (memberSymbolUId) {
-                    var memberIdentifierInfo = this.allIdentifierInfos[memberSymbolUId];
-                    var isExcludedProperty = false;
-                    for (var excludedPropertyKey in container.excludedProperties) {
-                        var memberIdentifierSymbol = memberIdentifierInfo.getSymbol();
-                        var excludedPropertySymbol = container.excludedProperties[excludedPropertyKey];
-                        // TJT: Review - How to determine equality here. For now just use name which seems pretty naive.
-                        if (memberIdentifierSymbol.name === excludedPropertySymbol.name) {
-                            isExcludedProperty = true;
-                            memberIdentifierInfo.shortenedName = memberIdentifierInfo.getName();
-                            break;
-                        }
-                    }
-                    if (!isExcludedProperty) {
-                        this.processIdentifierInfo(memberIdentifierInfo, container);
-                    }
-                }
-                else {
-                    Logger.warn("Container member does not have a UId");
-                }
-            }
-            else {
-                Logger.warn("Container member does not have a symbol.");
-            }
-        }
-    };
-    BundleMinifier.prototype.excludeNames = function (container) {
-        // Determine identifier names which cannot be used in this container.
-        // If this container extends a base/parent class then we exclude the base class member names.
-        var baseClass = container.getBaseClass();
-        if (baseClass) {
-            // We need to get the container for the parent/base class
-            var baseClassContainer = this.classifiableContainers[baseClass.name];
-            if (baseClassContainer) {
-                var baseClassMembers = baseClassContainer.getMembers();
-                if (baseClassMembers) {
-                    // The base class members must be excluded from this child class
-                    for (var memberKey in baseClassMembers) {
-                        var member = baseClassMembers[memberKey];
-                        var memberSymbol = member.symbol;
-                        var memberSymbolUId = Ast.getIdentifierUID(memberSymbol);
-                        var excludedSymbol = this.allIdentifierInfos[memberSymbolUId];
-                        if (excludedSymbol && excludedSymbol.shortenedName) {
-                            container.namesExcluded[excludedSymbol.shortenedName] = true;
-                        }
-                    }
-                }
-            }
-        }
-        for (var identifierInfoKey in container.localIdentifiers) {
-            var identifierInfo = container.localIdentifiers[identifierInfoKey];
-            this.excludeNamesForIdentifier(identifierInfo, container);
-        }
-        for (var classifiableKey in container.classifiableSymbols) {
-            var classSymbol = container.classifiableSymbols[classifiableKey];
-            var classSymbolUId = Ast.getIdentifierUID(classSymbol);
-            var classIdentifierInfo = this.allIdentifierInfos[classSymbolUId];
-            Debug.assert(classIdentifierInfo !== undefined, "Container classifiable identifier symbol not found.");
-            this.excludeNamesForIdentifier(classIdentifierInfo, container);
-        }
-    };
-    BundleMinifier.prototype.getContainerExcludedIdentifiers = function (container) {
-        // Recursively walk the container chain to find shortened identifier names that we cannot use in this container.
-        var target = this.compilerOptions.target;
-        var excludes = {};
-        function getContainerExcludes(container) {
-            // Recursively process the container block scoped children..
-            var containerChildren = container.getChildren();
-            for (var i = 0; i < containerChildren.length; i++) {
-                var childContainer = containerChildren[i];
-                //if ( childContainer.isBlockScoped() ) {
-                getContainerExcludes(childContainer);
-            }
-            // Get the excluded identifiers in this block scoped container..
-            for (var excludedIdentifierKey in container.excludedIdentifiers) {
-                var excludedIdentifier = container.excludedIdentifiers[excludedIdentifierKey];
-                // For function scoped identifiers we must exclude the identifier from the current container parent.
-                // Note that for ES5, which doesn't have block scoped variables, we must also exclude the identifier.
-                if ((!excludedIdentifier.isBlockScopedVariable) || (target === ts.ScriptTarget.ES5)) {
-                    if (!Utils.hasProperty(excludes, excludedIdentifier.getId())) {
-                        excludes[excludedIdentifier.getId()] = excludedIdentifier;
-                    }
-                }
-            }
-        }
-        // Start the search for excluded identifiers from the container's parent - the parent function scope container.
-        getContainerExcludes(container.getParent());
-        return excludes;
-    };
-    BundleMinifier.prototype.excludeNamesForIdentifier = function (identifierInfo, container) {
-        // Exclude all shortened names that have already been used in child containers that this identifer is contained in.
-        var identifierContainers = identifierInfo.getContainers();
-        // For each container that the identifier is contained in..
-        for (var containerKey in identifierContainers) {
-            var identifierContainer = identifierContainers[containerKey];
-            var containerExcludes = this.getContainerExcludedIdentifiers(identifierContainer);
-            // We can't use any names that have already been used in this referenced container
-            for (var excludedIdentifierKey in containerExcludes) {
-                var excludedIdentifier = containerExcludes[excludedIdentifierKey];
-                if (excludedIdentifier.shortenedName) {
-                    container.namesExcluded[excludedIdentifier.shortenedName] = true;
-                }
-            }
-        }
-    };
-    BundleMinifier.prototype.currentContainer = function () {
-        return this.containerStack[this.containerStack.length - 1];
-    };
-    BundleMinifier.prototype.restoreContainer = function () {
-        return this.containerStack.pop();
-    };
-    BundleMinifier.prototype.isNextContainer = function (node) {
-        var containerFlags = Ast.getContainerFlags(node);
-        if (containerFlags & (1 /* IsContainer */ | 2 /* IsBlockScopedContainer */)) {
-            var nextContainer = new Container(node, containerFlags, this.currentContainer());
-            // Check if the container symbol is classifiable. If so save it for inheritance processing.
-            var containerSymbol = node.symbol;
-            if (containerSymbol && (containerSymbol.flags & ts.SymbolFlags.Class)) {
-                var containerSymbolUId = Ast.getIdentifierUID(containerSymbol);
-                // Save the class symbol into the current container ( its parent )
-                if (!Utils.hasProperty(this.currentContainer().classifiableSymbols, containerSymbolUId)) {
-                    this.currentContainer().classifiableSymbols[containerSymbolUId] = containerSymbol;
-                }
-                // Save to the all classifiable containers table. See NOTE Inheritance below.
-                if (!Utils.hasProperty(this.classifiableContainers, containerSymbol.name)) {
-                    this.classifiableContainers[containerSymbol.name] = nextContainer;
-                }
-                // Check for inheritance. We need to do this now because the checker cannot be used once names are shortened.
-                var extendsClause = Ast.getExtendsClause(node);
-                if (extendsClause) {
-                    var baseClassSymbol = this.checker.getSymbolAtLocation(extendsClause.types[0].expression);
-                    // NOTE Inheritance:
-                    // If this child class is declared before the parent base class then the base class symbol will have symbolFlags.Merged.
-                    // When the base class is declared it will have a different symbol id from the symbol id determined here.
-                    // We should be able to use the symbol name for lookups in the classifiable containers table.
-                    // let baseClassAlias = this.checker.getAliasedSymbol(baseClassSymbol);
-                    nextContainer.setBaseClass(baseClassSymbol);
-                }
-            }
-            // Before changing the current container we must first add the new container to the children of the current container.
-            var currentContainer = this.currentContainer();
-            // If we don't have a container yet then it is the source file container ( the first ).
-            if (!currentContainer) {
-                this.sourceFileContainer = nextContainer;
-            }
-            else {
-                // Add new container context to the exising current container
-                currentContainer.addChildContainer(nextContainer);
-            }
-            this.containerStack.push(nextContainer);
-            return true;
-        }
-        return false;
-    };
-    BundleMinifier.prototype.reportWhitespaceStatistics = function () {
-        var statisticsReporter = new StatisticsReporter();
-        statisticsReporter.reportTime("Whitespace time", this.whiteSpaceTime);
-        statisticsReporter.reportPercentage("Whitespace reduction", ((this.whiteSpaceBefore - this.whiteSpaceAfter) / this.whiteSpaceBefore) * 100.00);
-    };
-    BundleMinifier.prototype.reportMinifyStatistics = function () {
-        var statisticsReporter = new StatisticsReporter();
-        statisticsReporter.reportTime("Minify time", this.transformTime);
-        statisticsReporter.reportCount("Total identifiers", this.identifierCount);
-        statisticsReporter.reportCount("Identifiers shortened", this.shortenedIdentifierCount);
-    };
-    return BundleMinifier;
-}(NodeWalker));
 var BuildResult = (function () {
-    //bundling?: BundleResult[];
-    function BuildResult(errors, project, bundles) {
+    function BuildResult(errors, bundles) {
         this.errors = errors;
-        this.project = project;
-        this.bundles = bundles;
+        this.bundleOutput = bundles;
     }
     BuildResult.prototype.succeeded = function () {
         return (this.errors.length == 0);
@@ -2039,40 +576,18 @@ var DiagnosticsReporter = (function () {
     };
     return DiagnosticsReporter;
 }());
-var ProjectBuildContext = (function () {
-    function ProjectBuildContext(host, config, program) {
-        this.host = host;
-        this.setProgram(program);
-        this.config = config;
+var BuildStream = (function (_super) {
+    __extends(BuildStream, _super);
+    function BuildStream(opts) {
+        _super.call(this, { objectMode: true });
     }
-    ProjectBuildContext.prototype.isWatchMode = function () {
-        this.config.compilerOptions.watch || false;
+    BuildStream.prototype._read = function () {
+        // Safely do nothing
     };
-    ProjectBuildContext.prototype.getProgram = function () {
-        return this.program;
-    };
-    ProjectBuildContext.prototype.setProgram = function (program) {
-        if (this.program) {
-            var newSourceFiles_1 = program ? program.getSourceFiles() : undefined;
-            Utils.forEach(this.program.getSourceFiles(), function (sourceFile) {
-                // Remove fileWatcher from the outgoing program source files if they are not in the 
-                // new program source file set
-                if (!(newSourceFiles_1 && Utils.contains(newSourceFiles_1, sourceFile))) {
-                    var watchedSourceFile = sourceFile;
-                    if (watchedSourceFile.fileWatcher) {
-                        watchedSourceFile.fileWatcher.unwatch(watchedSourceFile.fileName);
-                    }
-                }
-            });
-        }
-        // Update the host with the new program
-        this.host.setReuseableProgram(program);
-        this.program = program;
-    };
-    return ProjectBuildContext;
-}());
+    return BuildStream;
+}(stream.Readable));
 var BundleBuilder = (function () {
-    function BundleBuilder(compilerHost, program) {
+    function BundleBuilder(host, program) {
         this.dependencyTime = 0;
         this.dependencyWalkTime = 0;
         this.emitTime = 0;
@@ -2082,14 +597,14 @@ var BundleBuilder = (function () {
         this.bundleImportedFiles = {};
         this.bundleModuleImports = {};
         this.bundleSourceFiles = {};
-        this.compilerHost = compilerHost;
+        this.host = host;
         this.program = program;
     }
     BundleBuilder.prototype.build = function (bundle) {
         var _this = this;
         this.bundle = bundle;
         this.buildTime = new Date().getTime();
-        var dependencyBuilder = new DependencyBuilder(this.compilerHost, this.program);
+        var dependencyBuilder = new DependencyBuilder(this.host, this.program);
         // Construct bundle output file name
         var bundleBaseDir = path.dirname(bundle.name);
         if (bundle.config.outDir) {
@@ -2109,7 +624,7 @@ var BundleBuilder = (function () {
         var _loop_1 = function() {
             var fileName = bundle.fileNames[filesKey];
             Logger.info(">>> Processing bundle file:", fileName);
-            var bundleSourceFileName = this_1.compilerHost.getCanonicalFileName(TsCore.normalizeSlashes(fileName));
+            var bundleSourceFileName = this_1.host.getCanonicalFileName(TsCore.normalizeSlashes(fileName));
             Logger.info("BundleSourceFileName:", bundleSourceFileName);
             var bundleSourceFile = this_1.program.getSourceFile(bundleSourceFileName);
             if (!bundleSourceFile) {
@@ -2141,7 +656,7 @@ var BundleBuilder = (function () {
                     var dependencySymbol = _this.getSymbolFromNode(moduleDependencyNode);
                     var dependencyFile = TsCore.getSourceFileFromSymbol(dependencySymbol);
                     if (dependencyFile && !dependencyFile.isDeclarationFile) {
-                        var dependencyFileName = _this.compilerHost.getCanonicalFileName(dependencyFile.fileName);
+                        var dependencyFileName = _this.host.getCanonicalFileName(dependencyFile.fileName);
                         var dependencyNodes = moduleDependencies[dependencyFileName];
                         if (dependencyNodes) {
                             _this.processModuleDependencies(moduleDependencyNode, dependencyNodes);
@@ -2205,7 +720,7 @@ var BundleBuilder = (function () {
             var dependencySymbol = this.getSymbolFromNode(dependencyNode);
             var dependencyFile = TsCore.getSourceFileFromSymbol(dependencySymbol);
             if (dependencyFile && !dependencyFile.isDeclarationFile) {
-                var dependencyFileName = this.compilerHost.getCanonicalFileName(dependencyFile.fileName);
+                var dependencyFileName = this.host.getCanonicalFileName(dependencyFile.fileName);
                 var dependencyBindings = this.getNamedBindingsFromImport(dependencyNode);
                 if (this.isInheritedBinding(moduleDependencyNode, dependencyBindings)) {
                     // Add the dependency file to the bundle now if it is required for inheritance. 
@@ -2373,7 +888,7 @@ var BundleBuilder = (function () {
             // white out export modifiers where applicable
             var editText = this.processImportExports(file);
             this.bundleCodeText += editText + "\n";
-            var sourceFileName = this.compilerHost.getCanonicalFileName(file.fileName);
+            var sourceFileName = this.host.getCanonicalFileName(file.fileName);
             this.bundleImportedFiles[sourceFileName] = sourceFileName;
         }
         else {
@@ -2428,308 +943,18 @@ var BundleBuilder = (function () {
     };
     return BundleBuilder;
 }());
-var BundleCompiler = (function () {
-    function BundleCompiler(compilerHost, program) {
-        this.emitTime = 0;
-        this.compileTime = 0;
-        this.preEmitTime = 0;
-        this.bundleSourceFiles = {};
-        this.compilerHost = compilerHost;
-        this.program = program;
-        //this.outputStream = outputStream;
-        this.compilerOptions = this.program.getCompilerOptions();
-    }
-    BundleCompiler.prototype.compile = function (bundleFile, bundleConfig) {
-        var _this = this;
-        Logger.log("Compiling bundle...");
-        this.compileTime = this.preEmitTime = new Date().getTime();
-        // Bundle data
-        var bundleFileName;
-        var bundleFileText;
-        var bundleSourceFile;
-        // The list of bundle files to pass to program 
-        var bundleFiles = [];
-        // TJT: Bug - How to resolve duplicate identifier error
-        Utils.forEach(this.program.getSourceFiles(), function (file) {
-            bundleFiles.push(file.fileName);
-        });
-        var outputText = {};
-        var defaultGetSourceFile;
-        var minifyBundle = bundleConfig.minify || false;
-        if (minifyBundle) {
-            // Create the minified bundle fileName
-            var bundleDir = path.dirname(bundleFile.path);
-            var bundleName = path.basename(bundleFile.path, bundleFile.extension);
-            bundleFileName = TsCore.normalizeSlashes(path.join(bundleDir, bundleName + ".min.ts"));
-        }
-        else {
-            bundleFileName = bundleFile.path;
-        }
-        bundleFileText = bundleFile.text;
-        this.bundleSourceFiles[bundleFileName] = bundleFileText;
-        bundleSourceFile = ts.createSourceFile(bundleFileName, bundleFile.text, this.compilerOptions.target);
-        bundleFiles.push(bundleFileName);
-        // Reuse the project program source files
-        Utils.forEach(this.program.getSourceFiles(), function (file) {
-            _this.bundleSourceFiles[file.fileName] = file.text;
-        });
-        function writeFile(fileName, data, writeByteOrderMark, onError) {
-            outputText[fileName] = data;
-        }
-        function getSourceFile(fileName, languageVersion, onError) {
-            if (fileName === bundleFileName) {
-                return bundleSourceFile;
-            }
-            // Use base class to get the all source files other than the bundle
-            var sourceFile = defaultGetSourceFile(fileName, languageVersion, onError);
-            return sourceFile;
-        }
-        // Override the compileHost getSourceFile() function to get the bundle source file
-        defaultGetSourceFile = this.compilerHost.getSourceFile;
-        this.compilerHost.getSourceFile = getSourceFile;
-        this.compilerHost.writeFile = writeFile;
-        // Allow bundle config to extent the project compilerOptions for declaration and source map emitted output
-        var compilerOptions = this.compilerOptions;
-        compilerOptions.declaration = bundleConfig.declaration || this.compilerOptions.declaration;
-        compilerOptions.sourceMap = bundleConfig.sourceMap || this.compilerOptions.sourceMap;
-        compilerOptions.noEmit = false; // Always emit bundle output
-        if (minifyBundle) {
-            // TJT: Temporary workaround. If declaration is true when minifying an emit error occurs.
-            compilerOptions.declaration = false;
-            compilerOptions.removeComments = true;
-        }
-        // Pass the current project build program to reuse program structure
-        var bundlerProgram = ts.createProgram(bundleFiles, compilerOptions, this.compilerHost);
-        // Check for preEmit diagnostics
-        var preEmitDiagnostics = ts.getPreEmitDiagnostics(bundlerProgram);
-        this.preEmitTime = new Date().getTime() - this.preEmitTime;
-        // Return if noEmitOnError flag is set, and we have errors
-        if (this.compilerOptions.noEmitOnError && preEmitDiagnostics.length > 0) {
-            return new CompilerResult(true, preEmitDiagnostics);
-        }
-        if (minifyBundle) {
-            Logger.log("Minifying bundle...");
-            var minifier = new BundleMinifier(bundlerProgram, compilerOptions, bundleConfig);
-            bundleSourceFile = minifier.transform(bundleSourceFile);
-        }
-        this.emitTime = new Date().getTime();
-        var emitResult = bundlerProgram.emit(bundleSourceFile);
-        this.emitTime = new Date().getTime() - this.emitTime;
-        // TODO: Decouple task
-        // Always stream the bundle source file ts - even if emit errors.
-        //Logger.info( "Streaming vinyl bundle source: ", bundleFileName );
-        //var tsVinylFile = new TsVinylFile( {
-        //    path: bundleFileName,
-        //    contents: new Buffer( bundleSourceFile.text )
-        //});
-        //this.outputStream.push( tsVinylFile );
-        // Concat any emit errors
-        var allDiagnostics = preEmitDiagnostics.concat(emitResult.diagnostics);
-        // If the emitter didn't emit anything, then pass that value along.
-        if (emitResult.emitSkipped) {
-            return new CompilerResult(true, allDiagnostics);
-        }
-        // The emitter emitted something, inform the caller if that happened in the presence of diagnostics.
-        if (this.compilerOptions.noEmitOnError && allDiagnostics.length > 0) {
-            return new CompilerResult(false, allDiagnostics, emitResult.emittedFiles, outputText);
-        }
-        // Emit the output files even if errors ( noEmitOnError is false ).
-        //// Stream the emitted files...
-        //let bundleDir = path.dirname( bundleFile.path );
-        //let bundleName = path.basename( bundleFile.path, bundleFile.extension );
-        //let bundlePrefixExt = minifyBundle ? ".min" : "";
-        //let jsBundlePath = TsCore.normalizeSlashes( path.join( bundleDir, bundleName + bundlePrefixExt + ".js" ) );
-        //// js should have been generated, but just in case!
-        //if ( Utils.hasProperty( outputText, jsBundlePath ) ) {
-        //    let jsContents = outputText[ jsBundlePath ];
-        //    if ( minifyBundle ) {
-        //        // Whitespace removal cannot be performed in the AST minification transform, so we do it here for now
-        //        let minifier = new BundleMinifier( bundlerProgram, compilerOptions, bundleConfig );
-        //        jsContents = minifier.removeWhitespace( jsContents );
-        //    }
-        //    Logger.info( "Streaming vinyl js: ", bundleName );
-        //    var bundleJsVinylFile = new TsVinylFile( {
-        //        path: jsBundlePath,
-        //        contents: new Buffer( jsContents )
-        //    });
-        //    this.outputStream.push( bundleJsVinylFile );
-        //}
-        //let dtsBundlePath = TsCore.normalizeSlashes( path.join( bundleDir, bundleName + bundlePrefixExt + ".d.ts" ) );
-        //// d.ts is generated, if compiler option declaration is true
-        //if ( Utils.hasProperty( outputText, dtsBundlePath ) ) {
-        //    Logger.info( "Streaming vinyl d.ts: ", dtsBundlePath );
-        //    var bundleDtsVinylFile = new TsVinylFile( {
-        //        path: dtsBundlePath,
-        //        contents: new Buffer( outputText[ dtsBundlePath ] )
-        //    });
-        //    this.outputStream.push( bundleDtsVinylFile );
-        //}
-        //let mapBundlePath = TsCore.normalizeSlashes( path.join( bundleDir, bundleName + bundlePrefixExt + ".js.map" ) );
-        //// js.map is generated, if compiler option sourceMap is true
-        //if ( Utils.hasProperty( outputText, mapBundlePath ) ) {
-        //    Logger.info( "Streaming vinyl js.map: ", mapBundlePath );
-        //    var bundleMapVinylFile = new TsVinylFile( {
-        //        path: mapBundlePath,
-        //        contents: new Buffer( outputText[mapBundlePath] )
-        //    });
-        //    this.outputStream.push( bundleMapVinylFile );
-        //}
-        this.compileTime = new Date().getTime() - this.compileTime;
-        if (this.compilerOptions.diagnostics)
-            this.reportStatistics();
-        return new CompilerResult(false, allDiagnostics);
-    };
-    BundleCompiler.prototype.reportStatistics = function () {
-        var statisticsReporter = new StatisticsReporter();
-        statisticsReporter.reportTime("Pre-emit time", this.preEmitTime);
-        statisticsReporter.reportTime("Emit time", this.emitTime);
-        statisticsReporter.reportTime("Compile time", this.compileTime);
-    };
-    return BundleCompiler;
-}());
 var Project = (function () {
     function Project(configFilePath, settings) {
-        var _this = this;
-        this.totalBuildTime = 0;
-        this.totalCompileTime = 0;
-        this.totalPreBuildTime = 0;
-        this.totalBundleTime = 0;
-        this.onConfigFileChanged = function (path, stats) {
-            // Throw away the build context and start a fresh rebuild
-            _this.buildContext = undefined;
-            _this.startRebuildTimer();
-        };
-        this.onSourceFileChanged = function (sourceFile, path, stats) {
-            sourceFile.fileWatcher.unwatch(sourceFile.fileName);
-            sourceFile.fileWatcher = undefined;
-            _this.startRebuildTimer();
-        };
-        this.onRebuildTimeout = function () {
-            _this.rebuildTimer = undefined;
-            var buildStatus = _this.buildWorker();
-            // FIXME
-            //this.reportBuildStatus( buildStatus );
-            if (_this.buildContext.config.compilerOptions.watch) {
-                Logger.log("Watching for project changes...");
-            }
-        };
         this.configFilePath = configFilePath;
-        this.settings = settings;
+        this.settings = settings || {};
+        this.config = this.parseProjectConfig();
     }
-    Project.prototype.build = function (onDone) {
-        var config = this.parseProjectConfig();
-        if (!config.success) {
-            DiagnosticsReporter.reportDiagnostics(config.errors);
-            onDone(new BuildResult(config.errors));
-            return;
-        }
-        this.buildContext = this.createBuildContext(config);
-        Logger.log("Building Project with: " + chalk.magenta("" + this.configFileName));
-        Logger.log("TypeScript compiler version: ", ts.version);
-        // Perform the build..
-        var buildResult = this.buildWorker();
-        // FIXME
-        this.reportBuildStatus(buildResult);
-        if (config.compilerOptions.watch) {
-            Logger.log("Watching for project changes...");
-        }
-        else {
-            this.completeProjectBuild();
-        }
-        onDone(buildResult);
-    };
-    Project.prototype.createBuildContext = function (config) {
-        if (config.compilerOptions.watch) {
-            if (!this.watchProject()) {
-                config.compilerOptions.watch = false;
-            }
-        }
-        var compilerHost = new WatchCompilerHost(config.compilerOptions, this.onSourceFileChanged);
-        return new ProjectBuildContext(compilerHost, config);
-    };
-    Project.prototype.watchProject = function () {
-        var _this = this;
-        if (!ts.sys.watchFile) {
-            var diagnostic = TsCore.createDiagnostic({ code: 5001, category: ts.DiagnosticCategory.Warning, key: "The_current_node_host_does_not_support_the_0_option_5001", message: "The current node host does not support the '{0}' option." }, "-watch");
-            DiagnosticsReporter.reportDiagnostic(diagnostic);
-            return false;
-        }
-        // Add a watcher to the project config file if we haven't already done so.
-        if (!this.configFileWatcher) {
-            this.configFileWatcher = chokidar.watch(this.configFileName);
-            this.configFileWatcher.on("change", function (path, stats) { return _this.onConfigFileChanged(path, stats); });
-        }
-        return true;
-    };
-    Project.prototype.completeProjectBuild = function () {
-        // End the build process by sending EOF to the compilation output stream.
-        //this.outputStream.push( null );
-    };
-    Project.prototype.buildWorker = function () {
-        this.totalBuildTime = this.totalPreBuildTime = new Date().getTime();
-        if (!this.buildContext) {
-            var config = this.parseProjectConfig();
-            if (!config.success) {
-                DiagnosticsReporter.reportDiagnostics(config.errors);
-                return new BuildResult(config.errors);
-            }
-            this.buildContext = this.createBuildContext(config);
-        }
-        var fileNames = this.buildContext.config.fileNames;
-        var bundles = this.buildContext.config.bundles;
-        var compilerOptions = this.buildContext.config.compilerOptions;
-        // Create a new program to handle the incremental build. Pass the current build context program ( if it exists )
-        // to reuse the current program structure.
-        var program = ts.createProgram(fileNames, compilerOptions, this.buildContext.host, this.buildContext.getProgram());
-        this.totalPreBuildTime = new Date().getTime() - this.totalPreBuildTime;
-        // Save the new program to the build context
-        this.buildContext.setProgram(program);
-        // Compile the project...
-        var compiler = new Compiler(this.buildContext.host, program);
-        this.totalCompileTime = new Date().getTime();
-        var projectCompileResult = compiler.compile();
-        this.totalCompileTime = new Date().getTime() - this.totalCompileTime;
-        if (!projectCompileResult.succeeded()) {
-            DiagnosticsReporter.reportDiagnostics(projectCompileResult.getErrors());
-            return new BuildResult(projectCompileResult.getErrors(), projectCompileResult);
-        }
-        if (compilerOptions.listFiles) {
-            Utils.forEach(this.buildContext.getProgram().getSourceFiles(), function (file) {
-                Logger.log(file.fileName);
-            });
-        }
-        var allDiagnostics = [];
-        var bundleCompileResults = [];
-        var bundlingResults = [];
-        this.totalBundleTime = new Date().getTime();
-        // Build bundles..
-        var bundleBuilder = new BundleBuilder(this.buildContext.host, this.buildContext.getProgram());
-        var bundleCompiler = new BundleCompiler(this.buildContext.host, this.buildContext.getProgram());
-        for (var i = 0, len = bundles.length; i < len; i++) {
-            Logger.log("Building bundle: ", chalk.cyan(bundles[i].name));
-            var bundleResult = bundleBuilder.build(bundles[i]);
-            bundlingResults.push(bundleResult);
-            if (!bundleResult.succeeded()) {
-                DiagnosticsReporter.reportDiagnostics(bundleResult.getErrors());
-                allDiagnostics.concat(bundleResult.getErrors());
-                continue;
-            }
-            var bundleCompileResult = bundleCompiler.compile(bundleResult.getBundleSource(), bundles[i].config);
-            bundleCompileResults.push(bundleCompileResult);
-            if (!bundleCompileResult.succeeded()) {
-                DiagnosticsReporter.reportDiagnostics(projectCompileResult.getErrors());
-                allDiagnostics.concat(projectCompileResult.getErrors());
-            }
-        }
-        this.totalBundleTime = new Date().getTime() - this.totalBundleTime;
-        this.totalBuildTime = new Date().getTime() - this.totalBuildTime;
-        if (compilerOptions.diagnostics) {
-            this.reportStatistics();
-        }
-        return new BuildResult(allDiagnostics, projectCompileResult, bundleCompileResults);
+    Project.prototype.getConfig = function () {
+        return this.config;
     };
     Project.prototype.parseProjectConfig = function () {
         var _this = this;
+        var configFileDir;
         try {
             var isConfigDirectory = fs.lstatSync(this.configFilePath).isDirectory();
         }
@@ -2738,64 +963,54 @@ var Project = (function () {
             return { success: false, errors: [diagnostic] };
         }
         if (isConfigDirectory) {
-            this.configFileDir = this.configFilePath;
+            configFileDir = this.configFilePath;
             this.configFileName = path.join(this.configFilePath, "tsconfig.json");
         }
         else {
-            this.configFileDir = path.dirname(this.configFilePath);
+            configFileDir = path.dirname(this.configFilePath);
             this.configFileName = this.configFilePath;
         }
         Logger.info("Reading config file:", this.configFileName);
-        var readConfigResult = ts.readConfigFile(this.configFileName, this.readFile);
+        var readConfigResult = ts.readConfigFile(this.configFileName, this.readConfigFile);
         if (readConfigResult.error) {
-            return { success: false, errors: [readConfigResult.error] };
+            return { success: false, configFile: this.configFileName, errors: [readConfigResult.error] };
         }
         var configObject = readConfigResult.config;
         // Parse standard project configuration objects: compilerOptions, files.
         Logger.info("Parsing config file...");
-        var configParseResult = ts.parseJsonConfigFileContent(configObject, ts.sys, this.configFileDir);
+        var configParseResult = ts.parseJsonConfigFileContent(configObject, ts.sys, configFileDir);
         if (configParseResult.errors.length > 0) {
-            return { success: false, errors: configParseResult.errors };
+            return { success: false, configFile: this.configFileName, errors: configParseResult.errors };
         }
         // The returned "Files" list may contain file glob patterns. 
-        configParseResult.fileNames = this.expandFileNames(configParseResult.fileNames, this.configFileDir);
-        // The glob file patterns in "Files" is an enhancement to the standard Typescript project file (tsconfig.json) spec.
-        // To convert the project file to use only a standard filename list, specify the setting: "convertFiles" : "true"
-        if (this.settings.convertFiles === true) {
-            this.convertProjectFileNames(configParseResult.fileNames, this.configFileDir);
-        }
+        configParseResult.fileNames = this.expandFileNames(configParseResult.fileNames, configFileDir);
         // Parse "bundle" project configuration objects: compilerOptions, files.
         var bundleParser = new BundleParser();
-        var bundlesParseResult = bundleParser.parseConfigFile(configObject, this.configFileDir);
+        var bundlesParseResult = bundleParser.parseConfigFile(configObject, configFileDir);
         if (bundlesParseResult.errors.length > 0) {
-            return { success: false, errors: bundlesParseResult.errors };
+            return { success: false, configFile: this.configFileName, errors: bundlesParseResult.errors };
         }
         // The returned bundles "Files" list may contain file glob patterns. 
         bundlesParseResult.bundles.forEach(function (bundle) {
-            bundle.fileNames = _this.expandFileNames(bundle.fileNames, _this.configFileDir);
+            bundle.fileNames = _this.expandFileNames(bundle.fileNames, configFileDir);
         });
         // Parse the command line args to override project file compiler options
-        var settingsCompilerOptions = this.getSettingsCompilerOptions(this.settings, this.configFileDir);
+        var settingsCompilerOptions = this.getSettingsCompilerOptions(this.settings, configFileDir);
         // Check for any errors due to command line parsing
         if (settingsCompilerOptions.errors.length > 0) {
-            return { success: false, errors: settingsCompilerOptions.errors };
+            return { success: false, configFile: this.configFileName, errors: settingsCompilerOptions.errors };
         }
         var compilerOptions = Utils.extend(settingsCompilerOptions.options, configParseResult.options);
-        Logger.info("Compiler options: ", compilerOptions);
         return {
             success: true,
+            configFile: this.configFileName,
+            bundlerOptions: this.settings,
             compilerOptions: compilerOptions,
             fileNames: configParseResult.fileNames,
             bundles: bundlesParseResult.bundles
         };
     };
-    Project.prototype.startRebuildTimer = function () {
-        if (this.rebuildTimer) {
-            clearTimeout(this.rebuildTimer);
-        }
-        this.rebuildTimer = setTimeout(this.onRebuildTimeout, 250);
-    };
-    Project.prototype.readFile = function (fileName) {
+    Project.prototype.readConfigFile = function (fileName) {
         return ts.sys.readFile(fileName);
     };
     Project.prototype.getSettingsCompilerOptions = function (jsonSettings, configDirPath) {
@@ -2852,46 +1067,166 @@ var Project = (function () {
             }
         }
         catch (e) {
-            Logger.log(chalk.yellow("Converting project files failed."));
+            if (this.config.bundlerOptions.verbose) {
+                Logger.log(chalk.yellow("Converting project files failed."));
+            }
         }
-    };
-    Project.prototype.reportBuildStatus = function (buildResult) {
-        if (buildResult.succeeded()) {
-            Logger.log(chalk.green("Project build completed successfully."));
-        }
-        else {
-            Logger.log(chalk.red("Build completed with errors."));
-        }
-    };
-    Project.prototype.reportStatistics = function () {
-        var statisticsReporter = new StatisticsReporter();
-        statisticsReporter.reportTitle("Total build times...");
-        statisticsReporter.reportTime("Pre-build time", this.totalPreBuildTime);
-        statisticsReporter.reportTime("Compiling time", this.totalCompileTime);
-        statisticsReporter.reportTime("Bundling time", this.totalBundleTime);
-        statisticsReporter.reportTime("Build time", this.totalBuildTime);
     };
     return Project;
 }());
-var TsPackage;
-(function (TsPackage) {
-    function builder(configFilePath, settings, onDone) {
+var ProjectBuilder = (function () {
+    function ProjectBuilder(project) {
+        // TODO: move to BuildStatistics
+        this.totalBuildTime = 0;
+        this.totalCompileTime = 0;
+        this.totalPreBuildTime = 0;
+        this.totalBundleTime = 0;
+        this.project = project;
+        this.config = project.getConfig();
+    }
+    ProjectBuilder.prototype.build = function (buildCompleted) {
+        var _this = this;
+        if (!this.config.success) {
+            DiagnosticsReporter.reportDiagnostics(this.config.errors);
+            return buildCompleted(new BuildResult(this.config.errors));
+        }
+        // Perform the build..
+        this.buildWorker(function (result) {
+            // onBuildCompleted...
+            _this.reportBuildStatus(result);
+            return buildCompleted(result);
+        });
+    };
+    ProjectBuilder.prototype.src = function () {
+        if (!this.config.success && this.config.bundlerOptions.verbose) {
+            DiagnosticsReporter.reportDiagnostics(this.config.errors);
+            throw new Error("Invalid typescript configuration file" + this.config.configFile ? " " + this.config.configFile : "");
+        }
+        var outputStream = new BuildStream();
+        // Perform the build..
+        this.buildWorker(function (buildResult) {
+            // onBuildCompleted..
+            if (buildResult.succeeded) {
+                buildResult.bundleOutput.forEach(function (compileResult) {
+                    if (!compileResult.emitSkipped) {
+                        compileResult.emitOutput.forEach(function (emit) {
+                            if (!emit.emitSkipped) {
+                                if (emit.text) {
+                                    var vinylFile = new File({ path: emit.fileName, contents: new Buffer(emit.text) });
+                                    outputStream.push(vinylFile);
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+            outputStream.push(null);
+        });
+        return outputStream;
+    };
+    ProjectBuilder.prototype.buildWorker = function (buildCompleted) {
+        var config = this.project.getConfig();
+        if (config.bundlerOptions.verbose) {
+            Logger.log("Building project with: " + chalk.magenta("" + config.configFile));
+            Logger.log("TypeScript compiler version: ", ts.version);
+        }
+        this.totalBuildTime = this.totalPreBuildTime = new Date().getTime();
+        var fileNames = config.fileNames;
+        var bundles = config.bundles;
+        var compilerOptions = config.compilerOptions;
+        this.totalPreBuildTime = new Date().getTime() - this.totalPreBuildTime;
+        // Compile the project...
+        var compiler = new ts2js.Compiler(compilerOptions);
+        if (this.config.bundlerOptions.verbose) {
+            Logger.log("Compiling project files...");
+        }
+        this.totalCompileTime = new Date().getTime();
+        var projectCompileResult = compiler.compile(fileNames);
+        this.totalCompileTime = new Date().getTime() - this.totalCompileTime;
+        if (projectCompileResult.diagnostics.length > 0) {
+            DiagnosticsReporter.reportDiagnostics(projectCompileResult.diagnostics);
+            return buildCompleted(new BuildResult(projectCompileResult.diagnostics));
+        }
+        var allDiagnostics = [];
+        var bundleCompileResults = [];
+        var bundlingResults = [];
+        this.totalBundleTime = new Date().getTime();
+        // Create a bundle builder to build bundles..
+        var bundleBuilder = new BundleBuilder(compiler.getHost(), compiler.getProgram());
+        for (var i = 0, len = bundles.length; i < len; i++) {
+            if (this.config.bundlerOptions.verbose) {
+                Logger.log("Building bundle: ", chalk.cyan(bundles[i].name));
+            }
+            var bundleResult = bundleBuilder.build(bundles[i]);
+            bundlingResults.push(bundleResult);
+            if (!bundleResult.succeeded()) {
+                DiagnosticsReporter.reportDiagnostics(bundleResult.getErrors());
+                allDiagnostics.concat(bundleResult.getErrors());
+                continue;
+            }
+            var bundleSource = bundleResult.getBundleSource();
+            var compileResult;
+            if (bundles[i].config.minify) {
+                compileResult = tsMinifier.minifyModule(bundleSource.text, bundleSource.path, compilerOptions, { mangleIdentifiers: true, removeWhitespace: true });
+            }
+            else {
+                compileResult = ts2js.compileModule(bundleSource.text, bundleSource.path, compilerOptions);
+            }
+            bundleCompileResults.push(compileResult);
+            if (this.config.bundlerOptions.verbose && (compileResult.diagnostics.length > 0)) {
+                DiagnosticsReporter.reportDiagnostics(compileResult.diagnostics);
+                allDiagnostics.concat(compileResult.diagnostics);
+            }
+        }
+        this.totalBundleTime = new Date().getTime() - this.totalBundleTime;
+        this.totalBuildTime = new Date().getTime() - this.totalBuildTime;
+        if (compilerOptions.diagnostics) {
+            this.reportStatistics();
+        }
+        return buildCompleted(new BuildResult(allDiagnostics, bundleCompileResults));
+    };
+    ProjectBuilder.prototype.reportBuildStatus = function (buildResult) {
+        if (this.config.bundlerOptions.verbose) {
+            if (buildResult.succeeded()) {
+                Logger.log(chalk.green("Project build completed successfully."));
+            }
+            else {
+                Logger.log(chalk.red("Build completed with errors."));
+            }
+        }
+    };
+    ProjectBuilder.prototype.reportStatistics = function () {
+        if (this.config.bundlerOptions.verbose) {
+            var statisticsReporter = new StatisticsReporter();
+            statisticsReporter.reportTitle("Total build times...");
+            statisticsReporter.reportTime("Pre-build time", this.totalPreBuildTime);
+            statisticsReporter.reportTime("Compiling time", this.totalCompileTime);
+            statisticsReporter.reportTime("Bundling time", this.totalBundleTime);
+            statisticsReporter.reportTime("Build time", this.totalBuildTime);
+        }
+    };
+    return ProjectBuilder;
+}());
+//export { BundlerOptions }
+var TsBundler;
+(function (TsBundler) {
+    function builder(configFilePath, bundlerOptions, buildCompleted) {
         if (configFilePath === undefined && typeof configFilePath !== 'string') {
             throw new Error("Provide a valid directory or file path to the Typescript project configuration json file.");
         }
-        settings = settings || {};
-        settings.logLevel = settings.logLevel || 0;
-        Logger.setLevel(settings.logLevel);
-        Logger.setName("TsPackage");
-        var project = new Project(configFilePath, settings);
-        if (onDone) {
-            project.build(onDone);
+        bundlerOptions = bundlerOptions || {};
+        bundlerOptions.logLevel = bundlerOptions.logLevel || 0;
+        Logger.setLevel(bundlerOptions.logLevel);
+        Logger.setName("TsBundler");
+        var projectBuilder = new ProjectBuilder(new Project(configFilePath, bundlerOptions));
+        if (buildCompleted) {
+            projectBuilder.build(buildCompleted);
         }
-        return project;
+        return projectBuilder;
     }
-    TsPackage.builder = builder;
-})(TsPackage || (TsPackage = {}));
+    TsBundler.builder = builder;
+})(TsBundler || (TsBundler = {}));
 // Nodejs module exports
-module.exports = TsPackage;
-module.exports = TsPackage;
-//# sourceMappingURL=tspackage.js.map
+module.exports = TsBundler;
+module.exports = TsBundler;
+//# sourceMappingURL=tsbundler.js.map

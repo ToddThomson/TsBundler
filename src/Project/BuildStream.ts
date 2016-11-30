@@ -1,8 +1,8 @@
 ﻿import * as stream from "stream";
 
-export class CompileStream extends stream.Readable {
+export class BuildStream extends stream.Readable {
 
-    constructor (opts?: stream.ReadableOptions ) {
+    constructor( opts?: stream.ReadableOptions ) {
         super( { objectMode: true } );
     }
 
