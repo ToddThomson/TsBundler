@@ -1111,8 +1111,17 @@ var ProjectBuilder = (function () {
                     if (!compileResult.emitSkipped) {
                         compileResult.emitOutput.forEach(function (emit) {
                             if (!emit.emitSkipped) {
-                                if (emit.text) {
-                                    var vinylFile = new File({ path: emit.fileName, contents: new Buffer(emit.text) });
+                                var vinylFile;
+                                if (emit.codeFile) {
+                                    vinylFile = new File({ path: emit.codeFile.fileName, contents: new Buffer(emit.codeFile.data) });
+                                    outputStream.push(vinylFile);
+                                }
+                                if (emit.dtsFile) {
+                                    vinylFile = new File({ path: emit.dtsFile.fileName, contents: new Buffer(emit.dtsFile.data) });
+                                    outputStream.push(vinylFile);
+                                }
+                                if (emit.mapFile) {
+                                    vinylFile = new File({ path: emit.mapFile.fileName, contents: new Buffer(emit.mapFile.data) });
                                     outputStream.push(vinylFile);
                                 }
                             }
@@ -1207,9 +1216,11 @@ var ProjectBuilder = (function () {
     };
     return ProjectBuilder;
 }());
-//export { BundlerOptions }
+// Interface Types...
+;
 var TsBundler;
 (function (TsBundler) {
+    ;
     function builder(configFilePath, bundlerOptions, buildCompleted) {
         if (configFilePath === undefined && typeof configFilePath !== 'string') {
             throw new Error("Provide a valid directory or file path to the Typescript project configuration json file.");
@@ -1225,8 +1236,7 @@ var TsBundler;
         return projectBuilder;
     }
     TsBundler.builder = builder;
-})(TsBundler || (TsBundler = {}));
-// Nodejs module exports
-module.exports = TsBundler;
+})(TsBundler = exports.TsBundler || (exports.TsBundler = {}));
+// TJT: Comment out when testing locally
 module.exports = TsBundler;
 //# sourceMappingURL=tsbundler.js.map

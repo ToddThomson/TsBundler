@@ -7,24 +7,21 @@ import * as ts from "typescript";
 import * as tsc from "ts2js";
 import * as stream from "stream";
 
-//export { BundlerOptions }
+// Interface Types...
+export { BundlerOptions };
 
-namespace TsBundler {
+export interface BuildResult {
+    errors: ts.Diagnostic[];
+    bundleOutput?: tsc.CompilerResult[];
+    succeeded(): boolean;
+};
 
-    export interface BuildResult {
-        errors: ts.Diagnostic[];
-        bundles?: tsc.CompilerResult[];
-        succeeded(): boolean;
-    }
-
-    export interface OnBuildCompletedCallback {
-        ( result: BuildResult ): void;
-    }
+export namespace TsBundler {
 
     export interface BundleBuilder {
-        build( onDone: ( result: BuildResult ) => void ): void;
-        src(): stream.Readable;
-    }
+        build( buildCompleted: ( result: BuildResult ) => void ): void;
+        src(): stream.Readable;    
+    };
 
     export function builder( configFilePath: string, bundlerOptions?: BundlerOptions, buildCompleted?: ( result: BuildResult ) => void ): BundleBuilder {
 
@@ -48,7 +45,5 @@ namespace TsBundler {
     }
 }
 
-// Nodejs module exports
+// TJT: Comment out when testing locally
 module.exports = TsBundler;
-
-export = TsBundler;

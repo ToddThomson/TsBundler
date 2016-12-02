@@ -1,5 +1,6 @@
 ﻿
 export interface BundlerOptions {
     logLevel?: number;
-    verbose?: boolean
+    verbose?: boolean;
+    outDir?: string;
 }

@@ -1,22 +1,17 @@
-﻿import * as tsbundler from "./src/tsbundler";
+﻿import { TsBundler, BundlerOptions, BuildResult } from "./src/tsbundler";
 var gulp = require( "gulp" );
 
-var buildSettings = {
+var bundlerOptions: BundlerOptions  = {
     logLevel: 0,
-    verbose: true,
-    compileToMemory: false,
-    compilerOptions: {
-        watch: false,
-        listFiles: false
-    }
+    verbose: true
 };
 
-var bundleBuilder = tsbundler.builder( "./src", buildSettings );
+var bundleBuilder = TsBundler.builder( "./src", bundlerOptions );
 
 bundleBuilder.src()
-    .pipe( gulp.dest( "./dist" ) );
+    .pipe( gulp.dest( "./dist/gulp" ) );
 
-bundleBuilder.build( ( result: tsbundler.BuildResult ) => {
+bundleBuilder.build( ( result: BuildResult ) => {
     if ( !result.succeeded ) {
         console.log( "build failed" );
     } else {

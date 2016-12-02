@@ -76,24 +76,31 @@ The following is a sample tsconfig.json showing the "bundles" property:
 npm install tsbundler
 ```
 
-## API
+## Node API
 
-    tsbundler.build( projectConfigPath: string, settings: any, ( result: BuildResult ) => {
-		if ( !result.Succeeded() ){
-			// Handle build errors...
-		}
-		else {
-			// Build succeeded...
-		}
-	});
+```
+    interface BundlerOptions {
+        verbose?: boolean;
+        logLevel?: number;
+        outDir?: string;
+    }
+    
+    interface BuildResult {
+        errors: ts.Diagnostic[];
+        bundleOutput?: ts2js.CompilerResult[];
+        succeeded(): boolean;
+    }
 
-Where:
+    interface BundleBuilder {
+        build( buildCompleted: (result: BuildResult) => void): void;
+        src(): stream.Readable;
+    }
+    
+    function builder(configFilePath: string, bundlerOptions?: BundlerOptions, buildCompleted?: (result: BuildResult) => void): BundleBuilder;
 
-**projectConfigPath** is a relative directory path to the default Typescript project file named "tsconfig.json".
-Or,
-**projectConfigPath** is a relative path to a named Typescript project file.   
+```
 
-## Building TsPackage
+## Building TsBundler
 
 TsBundler depends on [NPM](https://docs.npmjs.com/) as a package manager and 
 [Gulp](https://github.com/gulpjs/gulp/blob/master/docs/getting-started.md) as a build tool. 
@@ -106,4 +113,3 @@ Once Gulp is installed, you can build it with the following commands:
 npm install
 gulp build
 ```  
-

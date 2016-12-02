@@ -25,7 +25,7 @@
 
         "./Project/BuildStatistics.ts",
         "./Project/BuildStream.ts",
-        "./Project/IBundleBuilder.ts",
+        "./Project/BundleBuilder.ts",
         "./Project/ProjectBuilder.ts",
         "./Project/BuildResult.ts",
         "./Project/ProjectConfig.ts",

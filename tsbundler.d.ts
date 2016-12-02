@@ -4,23 +4,24 @@ import * as stream from "stream";
 
 declare namespace TsBundler {
     
-    export interface BundlerOptions {
+    interface BundlerOptions {
         verbose?: boolean;
         logLevel?: number;
+        outDir?: string;
     }
     
-    export interface BuildResult {
+    interface BuildResult {
         errors: ts.Diagnostic[];
         bundleOutput?: ts2js.CompilerResult[];
         succeeded(): boolean;
     }
 
-    export interface BundleBuilder {
+    interface BundleBuilder {
         build( buildCompleted: (result: BuildResult) => void): void;
         src(): stream.Readable;
     }
     
-    export function builder(configFilePath: string, bundlerOptions?: BundlerOptions, buildCompleted?: (result: BuildResult) => void): BundleBuilder;
+    function builder(configFilePath: string, bundlerOptions?: BundlerOptions, buildCompleted?: (result: BuildResult) => void): BundleBuilder;
 }
 
 export = TsBundler;

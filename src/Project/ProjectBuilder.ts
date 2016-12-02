@@ -6,7 +6,7 @@ import { BundlerOptions } from "../Bundler/BundlerOptions";
 import { BundleFile, BundleResult } from "../Bundler/BundleResult";
 import { Project } from "./Project";
 import { ProjectConfig } from "./ProjectConfig";
-import { IBundleBuilder } from "./IBundleBuilder";
+import { IBundleBuilder } from "./BundleBuilder";
 import { StatisticsReporter } from "../Reporting/StatisticsReporter";
 import { Logger } from "../Reporting/Logger";
 import { BundleParser, Bundle } from "../Bundler/BundleParser";
@@ -73,8 +73,20 @@ export class ProjectBuilder implements IBundleBuilder {
                     if ( !compileResult.emitSkipped ) {
                         compileResult.emitOutput.forEach(( emit ) => {
                             if ( !emit.emitSkipped ) {
-                                if ( emit.text ) {
-                                    const vinylFile = new File({ path: emit.fileName, contents: new Buffer( emit.text )})
+                                var vinylFile: File;
+                                if ( emit.codeFile ) {
+                                    vinylFile = new File({ path: emit.codeFile.fileName, contents: new Buffer( emit.codeFile.data )})
+
+                                    outputStream.push( vinylFile );
+                                }
+                                if ( emit.dtsFile ) {
+                                    vinylFile = new File({ path: emit.dtsFile.fileName, contents: new Buffer( emit.dtsFile.data )})
+
+                                    outputStream.push( vinylFile );
+                                }
+
+                                if ( emit.mapFile ) {
+                                    vinylFile = new File({ path: emit.mapFile.fileName, contents: new Buffer( emit.mapFile.data )})
 
                                     outputStream.push( vinylFile );
                                 }

@@ -58,7 +58,7 @@
     <TypeScriptCompile Include="src\Project\BuildStatistics.ts" />
     <TypeScriptCompile Include="src\Project\BuildStream.ts" />
     <TypeScriptCompile Include="src\Utils\Glob.ts" />
-    <TypeScriptCompile Include="src\Project\IBundleBuilder.ts" />
+    <TypeScriptCompile Include="src\Project\BundleBuilder.ts" />
     <TypeScriptCompile Include="src\Project\Project.ts" />
     <TypeScriptCompile Include="src\Project\ProjectBuilder.ts" />
     <TypeScriptCompile Include="src\Project\BuildResult.ts" />

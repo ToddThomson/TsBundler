@@ -1,6 +1,6 @@
 {
   "name": "tsbundler",
-  "version": "1.0.0-beta.3",
+  "version": "1.0.0-beta.4",
   "author": "Todd Thomson <todd.thomson@me.com>",
   "description": "Typescript single module bundle builder.",
   "license": "MIT",
@@ -22,8 +22,8 @@
     "lodash": "^4.17.2",
     "readable-stream": "^2.2.2",
     "through2": "^2.0.3",
-    "ts2js": "1.0.0-rc.4",
-    "tsminifier": "1.0.0-rc.3",
+    "ts2js": "^1.0.0-rc.7",
+    "tsminifier": "^1.0.0-rc.6",
     "typescript": "^2.0.10",
     "vinyl": "^1.2.0"
   },
@@ -38,25 +38,11 @@
   },
   "keywords": [
     "bundle",
+    "bundles",
     "bundling",
-    "typescript minifier",
-    "minify",
-    "minification",
-    "compiler",
-    "cache optimized compiler",
-    "incremental build",
-    "d.ts",
-    "declaration",
-    "definitions",
-    "ES6 external modules",
-    "library",
-    "modular typescript",
-    "module bundles",
-    "optimizer",
-    "project",
-    "transpiler",
-    "tsconfig.json",
-    "typescript bundles"
+    "typescript",
+    "bundle builder",
+    "typescript bundle"
   ],
   "homepage": "https://github.com/toddthomson/tsbundler",
   "repository": {
