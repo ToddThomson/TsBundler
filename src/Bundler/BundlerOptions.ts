@@ -2,5 +2,5 @@
 export interface BundlerOptions {
     logLevel?: number;
     verbose?: boolean;
-    outDir?: string;
+    outputToDisk?: boolean;
 }

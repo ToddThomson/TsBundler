@@ -48,11 +48,36 @@ export class ProjectBuilder implements IBundleBuilder {
         }
 
         // Perform the build..
-        this.buildWorker( ( result ) => {
+        this.buildWorker( ( buildResult ) => {
             // onBuildCompleted...
-            this.reportBuildStatus( result );
+
+            if ( this.config.bundlerOptions.outputToDisk ) {
+                if ( buildResult.succeeded ) {
+                    buildResult.bundleOutput.forEach( ( compileResult ) => {
+                        if ( !compileResult.emitSkipped ) {
+                            compileResult.emitOutput.forEach(( emit ) => {
+                                if ( !emit.emitSkipped ) {
+                                    var vinylFile: File;
+                                    if ( emit.codeFile ) {
+                                        fs.writeFile( emit.codeFile.fileName, emit.codeFile.data );
+                                    }
+                                    if ( emit.dtsFile ) {
+                                        fs.writeFile( emit.dtsFile.fileName, emit.dtsFile.data );
+                                    }
+
+                                    if ( emit.mapFile ) {
+                                        fs.writeFile( emit.mapFile.fileName, emit.mapFile.data );
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }
+            }
+          
+            this.reportBuildStatus( buildResult );
             
-            return buildCompleted( result );
+            return buildCompleted( buildResult );
         });
     }
 
@@ -193,7 +218,7 @@ export class ProjectBuilder implements IBundleBuilder {
     private reportBuildStatus( buildResult: BuildResult ) {
         if ( this.config.bundlerOptions.verbose ) {
             if ( buildResult.succeeded() ) {
-                Logger.log( chalk.green( "Project build completed successfully." ) );
+                Logger.log( chalk.green( "Build completed successfully." ) );
             }
             else {
                 Logger.log( chalk.red( "Build completed with errors." ) );

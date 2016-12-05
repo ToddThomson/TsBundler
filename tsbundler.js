@@ -944,9 +944,9 @@ var BundleBuilder = (function () {
     return BundleBuilder;
 }());
 var Project = (function () {
-    function Project(configFilePath, settings) {
+    function Project(configFilePath, bundlerOptions) {
         this.configFilePath = configFilePath;
-        this.settings = settings || {};
+        this.bundlerOptions = bundlerOptions || {};
         this.config = this.parseProjectConfig();
     }
     Project.prototype.getConfig = function () {
@@ -995,7 +995,7 @@ var Project = (function () {
             bundle.fileNames = _this.expandFileNames(bundle.fileNames, configFileDir);
         });
         // Parse the command line args to override project file compiler options
-        var settingsCompilerOptions = this.getSettingsCompilerOptions(this.settings, configFileDir);
+        var settingsCompilerOptions = this.getSettingsCompilerOptions(this.bundlerOptions, configFileDir);
         // Check for any errors due to command line parsing
         if (settingsCompilerOptions.errors.length > 0) {
             return { success: false, configFile: this.configFileName, errors: settingsCompilerOptions.errors };
@@ -1004,7 +1004,7 @@ var Project = (function () {
         return {
             success: true,
             configFile: this.configFileName,
-            bundlerOptions: this.settings,
+            bundlerOptions: this.bundlerOptions,
             compilerOptions: compilerOptions,
             fileNames: configParseResult.fileNames,
             bundles: bundlesParseResult.bundles
@@ -1091,10 +1091,32 @@ var ProjectBuilder = (function () {
             return buildCompleted(new BuildResult(this.config.errors));
         }
         // Perform the build..
-        this.buildWorker(function (result) {
+        this.buildWorker(function (buildResult) {
             // onBuildCompleted...
-            _this.reportBuildStatus(result);
-            return buildCompleted(result);
+            if (_this.config.bundlerOptions.outputToDisk) {
+                if (buildResult.succeeded) {
+                    buildResult.bundleOutput.forEach(function (compileResult) {
+                        if (!compileResult.emitSkipped) {
+                            compileResult.emitOutput.forEach(function (emit) {
+                                if (!emit.emitSkipped) {
+                                    var vinylFile;
+                                    if (emit.codeFile) {
+                                        fs.writeFile(emit.codeFile.fileName, emit.codeFile.data);
+                                    }
+                                    if (emit.dtsFile) {
+                                        fs.writeFile(emit.dtsFile.fileName, emit.dtsFile.data);
+                                    }
+                                    if (emit.mapFile) {
+                                        fs.writeFile(emit.mapFile.fileName, emit.mapFile.data);
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }
+            }
+            _this.reportBuildStatus(buildResult);
+            return buildCompleted(buildResult);
         });
     };
     ProjectBuilder.prototype.src = function () {
@@ -1197,7 +1219,7 @@ var ProjectBuilder = (function () {
     ProjectBuilder.prototype.reportBuildStatus = function (buildResult) {
         if (this.config.bundlerOptions.verbose) {
             if (buildResult.succeeded()) {
-                Logger.log(chalk.green("Project build completed successfully."));
+                Logger.log(chalk.green("Build completed successfully."));
             }
             else {
                 Logger.log(chalk.red("Build completed with errors."));

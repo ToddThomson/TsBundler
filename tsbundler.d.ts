@@ -6,8 +6,8 @@ declare namespace TsBundler {
     
     interface BundlerOptions {
         verbose?: boolean;
+        outputToDisk?: boolean;
         logLevel?: number;
-        outDir?: string;
     }
     
     interface BuildResult {

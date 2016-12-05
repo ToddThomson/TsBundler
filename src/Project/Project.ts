@@ -21,13 +21,13 @@ export class Project {
 
     private configFileName: string;
     private configFilePath: string;
-    private settings: BundlerOptions;
+    private bundlerOptions: BundlerOptions;
 
     private config: ProjectConfig;
 
-    constructor( configFilePath: string, settings?: BundlerOptions  ) {
+    constructor( configFilePath: string, bundlerOptions?: BundlerOptions  ) {
         this.configFilePath = configFilePath;
-        this.settings = settings || {};
+        this.bundlerOptions = bundlerOptions || {};
 
         this.config = this.parseProjectConfig();
     }
@@ -90,7 +90,7 @@ export class Project {
         });
 
         // Parse the command line args to override project file compiler options
-        let settingsCompilerOptions = this.getSettingsCompilerOptions( this.settings, configFileDir );
+        let settingsCompilerOptions = this.getSettingsCompilerOptions( this.bundlerOptions, configFileDir );
 
         // Check for any errors due to command line parsing
         if ( settingsCompilerOptions.errors.length > 0 ) {
@@ -102,7 +102,7 @@ export class Project {
         return {
             success: true,
             configFile: this.configFileName,
-            bundlerOptions: this.settings,
+            bundlerOptions: this.bundlerOptions,
             compilerOptions: compilerOptions,
             fileNames: configParseResult.fileNames,
             bundles: bundlesParseResult.bundles

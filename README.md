@@ -3,31 +3,17 @@
 # TsBundler
 TsBundler is a Typescript single module bundler and minifier.
 
-## NOTICE
-
-TsBundler is the replacement for TsProject. This is currently a work in progress. Please continue to use TsProject for now.
-
 ## Top Features
 
-* Bundling of ES6 external Typescript modules
-* Bundle minification with identifier shortening and whitespace removal
-* Cache optimized incremental project builds
-* File glob pattern matching for project files
- 
-## What's New
-
-TsBundler 1.0.0 supports Typescript 2.x.
-
-## Why TsBundler?
-
-TsBundler is the only Typescript 2.0 transpiler that provides minified, single file typescript bundles and javascript bundles for packaging of Typescript, javascript and Typescript definition files.
-TsBundler bundles file dependencies of external Typescript modules at compilation time rather than relying on build tools (AMD Optimizer, r.js for example ) further down in the build pipeline.
+* Bundling of external Typescript modules into a single file, single module bundle.
+* Bundle Typescript source file minification with identifier shortening and whitespace removal.
+* Bundle file output can be to output to memory, disk or gulp (vinyl file stream) 
 
 ## TsBundler Wiki
 
-Additional details can be found on the TsProject [wiki](https://github.com/ToddThomson/tspackage/wiki).
+Additional details can be found on the TsBundler [wiki](https://github.com/ToddThomson/TsBundler/wiki).
 
-## Typescript ES6 External Module Bundles
+## Typescript Single Module Bundles
 
 TsBundler supports a "bundles" property within the Typescript project configuration json file. The "bundles" property may contain a list of named bundles. Each bundle must provide an array of source files and may optionally specify bundle configuration settings. 
 The Typescript source file and its dependencies are packaged as a single Typescript file and output with the bundle name. The Typescript bundle is compiled to a single js javascript file and a single d.ts declaration file.
@@ -70,19 +56,13 @@ The following is a sample tsconfig.json showing the "bundles" property:
 }
 ```
 
-## How to install
-
-```
-npm install tsbundler
-```
-
 ## Node API
 
 ```
     interface BundlerOptions {
         verbose?: boolean;
         logLevel?: number;
-        outDir?: string;
+        outputToDisk?: string;
     }
     
     interface BuildResult {
@@ -98,6 +78,12 @@ npm install tsbundler
     
     function builder(configFilePath: string, bundlerOptions?: BundlerOptions, buildCompleted?: (result: BuildResult) => void): BundleBuilder;
 
+```
+
+## How to install
+
+```
+npm install tsbundler
 ```
 
 ## Building TsBundler
