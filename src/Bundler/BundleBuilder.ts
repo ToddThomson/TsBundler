@@ -2,6 +2,7 @@
 import { Logger } from "../Reporting/Logger";
 import { BundleParser, Bundle } from "./BundleParser";
 import { BundlePackage, BundlePackageType } from "./BundlePackage";
+import { BundlerOptions } from "./BundlerOptions";
 import { BundleResult } from "./BundleResult";
 import { DependencyBuilder } from "./DependencyBuilder";
 import { Glob } from "../Utils/Glob";
@@ -15,6 +16,7 @@ import * as path from "path";
 export class BundleBuilder {
 
     private bundle: Bundle;
+    private options: BundlerOptions;
 
     private host: ts.CompilerHost;
     private program: ts.Program;
@@ -31,9 +33,10 @@ export class BundleBuilder {
     private bundleModuleImports: ts.MapLike<ts.MapLike<string>> = {};
     private bundleSourceFiles: ts.MapLike<string> = {};
 
-    constructor( host: ts.CompilerHost, program: ts.Program ) {
+    constructor( host: ts.CompilerHost, program: ts.Program, bundlerOptions: BundlerOptions ) {
         this.host = host
         this.program = program;
+        this.options = bundlerOptions;
     }
 
     public build( bundle: Bundle ): BundleResult {
@@ -174,7 +177,7 @@ export class BundleBuilder {
 
         this.buildTime = new Date().getTime() - this.buildTime;
 
-        if ( (<any>this.program.getCompilerOptions()).diagnostics ) {
+        if ( this.options.verbose ) {
             this.reportStatistics();
         }
 

@@ -25,10 +25,6 @@ export namespace TsBundler {
 
     export function builder( configFilePath: string, bundlerOptions?: BundlerOptions, buildCompleted?: ( result: BuildResult ) => void ): BundleBuilder {
 
-        if ( configFilePath === undefined && typeof configFilePath !== 'string' ) {
-            throw new Error( "Provide a valid directory or file path to the Typescript project configuration json file." );
-        }
-
         bundlerOptions = bundlerOptions || {};
         bundlerOptions.logLevel = bundlerOptions.logLevel || 0;
 

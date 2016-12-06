@@ -6,7 +6,7 @@ var bundlerOptions: BundlerOptions  = {
     verbose: true
 };
 
-var bundleBuilder = TsBundler.builder( "./src", bundlerOptions );
+var bundleBuilder = TsBundler.builder( "./src/project", bundlerOptions );
 
 bundleBuilder.src()
     .pipe( gulp.dest( "./dist/gulp" ) );

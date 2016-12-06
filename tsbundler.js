@@ -13,6 +13,7 @@ var _ = require("lodash");
 var fileGlob = require("glob");
 var ts2js = require("ts2js");
 var tsMinifier = require("tsminifier");
+var gutil = require("gulp-util");
 var File = require("vinyl");
 var BundlePackageType;
 (function (BundlePackageType) {
@@ -587,7 +588,7 @@ var BuildStream = (function (_super) {
     return BuildStream;
 }(stream.Readable));
 var BundleBuilder = (function () {
-    function BundleBuilder(host, program) {
+    function BundleBuilder(host, program, bundlerOptions) {
         this.dependencyTime = 0;
         this.dependencyWalkTime = 0;
         this.emitTime = 0;
@@ -599,6 +600,7 @@ var BundleBuilder = (function () {
         this.bundleSourceFiles = {};
         this.host = host;
         this.program = program;
+        this.options = bundlerOptions;
     }
     BundleBuilder.prototype.build = function (bundle) {
         var _this = this;
@@ -709,7 +711,7 @@ var BundleBuilder = (function () {
         var bundleExtension = isBundleTsx ? ".tsx" : ".ts";
         var bundleFile = { path: bundleFilePath + bundleExtension, extension: bundleExtension, text: bundleText };
         this.buildTime = new Date().getTime() - this.buildTime;
-        if (this.program.getCompilerOptions().diagnostics) {
+        if (this.options.verbose) {
             this.reportStatistics();
         }
         return new BundleResult([], bundleFile);
@@ -948,6 +950,8 @@ var Project = (function () {
         this.configFilePath = configFilePath;
         this.bundlerOptions = bundlerOptions || {};
         this.config = this.parseProjectConfig();
+        // Add the bundler options to the overall project config
+        this.config.bundlerOptions = this.bundlerOptions;
     }
     Project.prototype.getConfig = function () {
         return this.config;
@@ -1004,14 +1008,17 @@ var Project = (function () {
         return {
             success: true,
             configFile: this.configFileName,
-            bundlerOptions: this.bundlerOptions,
             compilerOptions: compilerOptions,
             fileNames: configParseResult.fileNames,
             bundles: bundlesParseResult.bundles
         };
     };
     Project.prototype.readConfigFile = function (fileName) {
-        return ts.sys.readFile(fileName);
+        var text = ts.sys.readFile(fileName);
+        if (text === undefined) {
+            throw new Error("Configuration file does not exist.");
+        }
+        return text;
     };
     Project.prototype.getSettingsCompilerOptions = function (jsonSettings, configDirPath) {
         // Parse the json settings from the TsProject src() API
@@ -1079,7 +1086,6 @@ var ProjectBuilder = (function () {
         // TODO: move to BuildStatistics
         this.totalBuildTime = 0;
         this.totalCompileTime = 0;
-        this.totalPreBuildTime = 0;
         this.totalBundleTime = 0;
         this.project = project;
         this.config = project.getConfig();
@@ -1087,7 +1093,9 @@ var ProjectBuilder = (function () {
     ProjectBuilder.prototype.build = function (buildCompleted) {
         var _this = this;
         if (!this.config.success) {
-            DiagnosticsReporter.reportDiagnostics(this.config.errors);
+            if (this.config.bundlerOptions.verbose) {
+                DiagnosticsReporter.reportDiagnostics(this.config.errors);
+            }
             return buildCompleted(new BuildResult(this.config.errors));
         }
         // Perform the build..
@@ -1120,9 +1128,16 @@ var ProjectBuilder = (function () {
         });
     };
     ProjectBuilder.prototype.src = function () {
-        if (!this.config.success && this.config.bundlerOptions.verbose) {
-            DiagnosticsReporter.reportDiagnostics(this.config.errors);
-            throw new Error("Invalid typescript configuration file" + this.config.configFile ? " " + this.config.configFile : "");
+        var _this = this;
+        if (!this.config.success) {
+            if (this.config.bundlerOptions.verbose) {
+                DiagnosticsReporter.reportDiagnostics(this.config.errors);
+            }
+            var configFileName = this.config.configFile ? " " + this.config.configFile : "";
+            throw new gutil.PluginError({
+                plugin: "TsBundler",
+                message: "Invalid typescript configuration file" + configFileName
+            });
         }
         var outputStream = new BuildStream();
         // Perform the build..
@@ -1151,6 +1166,7 @@ var ProjectBuilder = (function () {
                     }
                 });
             }
+            _this.reportBuildStatus(buildResult);
             outputStream.push(null);
         });
         return outputStream;
@@ -1161,16 +1177,15 @@ var ProjectBuilder = (function () {
             Logger.log("Building project with: " + chalk.magenta("" + config.configFile));
             Logger.log("TypeScript compiler version: ", ts.version);
         }
-        this.totalBuildTime = this.totalPreBuildTime = new Date().getTime();
         var fileNames = config.fileNames;
         var bundles = config.bundles;
         var compilerOptions = config.compilerOptions;
-        this.totalPreBuildTime = new Date().getTime() - this.totalPreBuildTime;
         // Compile the project...
         var compiler = new ts2js.Compiler(compilerOptions);
         if (this.config.bundlerOptions.verbose) {
             Logger.log("Compiling project files...");
         }
+        this.totalBuildTime = new Date().getTime();
         this.totalCompileTime = new Date().getTime();
         var projectCompileResult = compiler.compile(fileNames);
         this.totalCompileTime = new Date().getTime() - this.totalCompileTime;
@@ -1183,7 +1198,10 @@ var ProjectBuilder = (function () {
         var bundlingResults = [];
         this.totalBundleTime = new Date().getTime();
         // Create a bundle builder to build bundles..
-        var bundleBuilder = new BundleBuilder(compiler.getHost(), compiler.getProgram());
+        var bundleBuilder = new BundleBuilder(compiler.getHost(), compiler.getProgram(), this.config.bundlerOptions);
+        if (this.config.bundlerOptions.verbose && (bundles.length == 0)) {
+            Logger.log(chalk.yellow("No bundles found to build."));
+        }
         for (var i = 0, len = bundles.length; i < len; i++) {
             if (this.config.bundlerOptions.verbose) {
                 Logger.log("Building bundle: ", chalk.cyan(bundles[i].name));
@@ -1211,7 +1229,7 @@ var ProjectBuilder = (function () {
         }
         this.totalBundleTime = new Date().getTime() - this.totalBundleTime;
         this.totalBuildTime = new Date().getTime() - this.totalBuildTime;
-        if (compilerOptions.diagnostics) {
+        if (this.config.bundlerOptions.verbose) {
             this.reportStatistics();
         }
         return buildCompleted(new BuildResult(allDiagnostics, bundleCompileResults));
@@ -1229,11 +1247,10 @@ var ProjectBuilder = (function () {
     ProjectBuilder.prototype.reportStatistics = function () {
         if (this.config.bundlerOptions.verbose) {
             var statisticsReporter = new StatisticsReporter();
-            statisticsReporter.reportTitle("Total build times...");
-            statisticsReporter.reportTime("Pre-build time", this.totalPreBuildTime);
+            statisticsReporter.reportTitle("Build times");
             statisticsReporter.reportTime("Compiling time", this.totalCompileTime);
             statisticsReporter.reportTime("Bundling time", this.totalBundleTime);
-            statisticsReporter.reportTime("Build time", this.totalBuildTime);
+            statisticsReporter.reportTime("Total Build time", this.totalBuildTime);
         }
     };
     return ProjectBuilder;
@@ -1244,9 +1261,6 @@ var TsBundler;
 (function (TsBundler) {
     ;
     function builder(configFilePath, bundlerOptions, buildCompleted) {
-        if (configFilePath === undefined && typeof configFilePath !== 'string') {
-            throw new Error("Provide a valid directory or file path to the Typescript project configuration json file.");
-        }
         bundlerOptions = bundlerOptions || {};
         bundlerOptions.logLevel = bundlerOptions.logLevel || 0;
         Logger.setLevel(bundlerOptions.logLevel);

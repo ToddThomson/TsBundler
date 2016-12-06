@@ -22,7 +22,9 @@ import * as fs from "fs";
 import * as path from "path";
 import * as chalk from "chalk";
 import * as stream from "stream";
+import * as gutil from "gulp-util";
 import File = require( "vinyl" );
+
 
 export class ProjectBuilder implements IBundleBuilder {
     private project: Project;
@@ -31,7 +33,6 @@ export class ProjectBuilder implements IBundleBuilder {
     // TODO: move to BuildStatistics
     private totalBuildTime: number = 0;
     private totalCompileTime: number = 0;
-    private totalPreBuildTime: number = 0;
     private totalBundleTime: number = 0;
 
     constructor( project: Project ) {
@@ -42,7 +43,10 @@ export class ProjectBuilder implements IBundleBuilder {
     public build( buildCompleted: ( result: BuildResult ) => void ): void {
 
         if ( !this.config.success ) {
-            DiagnosticsReporter.reportDiagnostics( this.config.errors );
+            
+            if ( this.config.bundlerOptions.verbose ) {
+                DiagnosticsReporter.reportDiagnostics( this.config.errors );
+            }
 
             return buildCompleted( new BuildResult( this.config.errors ) );
         }
@@ -82,10 +86,20 @@ export class ProjectBuilder implements IBundleBuilder {
     }
 
     public src(): stream.Readable {
-        if ( !this.config.success && this.config.bundlerOptions.verbose ) {
-            DiagnosticsReporter.reportDiagnostics( this.config.errors );
+        if ( !this.config.success ) {
+            
+            if ( this.config.bundlerOptions.verbose ) {
+                DiagnosticsReporter.reportDiagnostics( this.config.errors );
+            }
 
-            throw new Error( "Invalid typescript configuration file" + this.config.configFile ? " " + this.config.configFile : ""  );
+            const configFileName = this.config.configFile ? " " + this.config.configFile : "";
+
+            throw new gutil.PluginError({
+                plugin: "TsBundler",
+                message: "Invalid typescript configuration file" + configFileName 
+            });
+            
+            //throw new Error( "Invalid typescript configuration file" + configFileName  );
         }
 
         var outputStream = new BuildStream();
@@ -121,6 +135,8 @@ export class ProjectBuilder implements IBundleBuilder {
                 });
             }
 
+            this.reportBuildStatus( buildResult );
+
             outputStream.push( null );
         });
 
@@ -135,13 +151,9 @@ export class ProjectBuilder implements IBundleBuilder {
             Logger.log( "TypeScript compiler version: ", ts.version );
         }
 
-        this.totalBuildTime = this.totalPreBuildTime = new Date().getTime();
-
         let fileNames = config.fileNames;
         let bundles = config.bundles;
         let compilerOptions = config.compilerOptions;
-
-        this.totalPreBuildTime = new Date().getTime() - this.totalPreBuildTime;
 
         // Compile the project...
         let compiler = new ts2js.Compiler( compilerOptions );
@@ -149,7 +161,7 @@ export class ProjectBuilder implements IBundleBuilder {
         if ( this.config.bundlerOptions.verbose ) {
             Logger.log( "Compiling project files..." );
         }
-        
+        this.totalBuildTime = new Date().getTime();        
         this.totalCompileTime = new Date().getTime();
 
         var projectCompileResult = compiler.compile( fileNames );
@@ -169,7 +181,11 @@ export class ProjectBuilder implements IBundleBuilder {
         this.totalBundleTime = new Date().getTime();
 
         // Create a bundle builder to build bundles..
-        var bundleBuilder = new BundleBuilder( compiler.getHost(), compiler.getProgram() );
+        var bundleBuilder = new BundleBuilder( compiler.getHost(), compiler.getProgram(), this.config.bundlerOptions );
+
+        if ( this.config.bundlerOptions.verbose && ( bundles.length == 0 ) ) {
+            Logger.log( chalk.yellow( "No bundles found to build." ) );
+        }
 
         for ( var i = 0, len = bundles.length; i < len; i++ ) {
             if ( this.config.bundlerOptions.verbose ) {
@@ -208,7 +224,7 @@ export class ProjectBuilder implements IBundleBuilder {
         this.totalBundleTime = new Date().getTime() - this.totalBundleTime;
         this.totalBuildTime = new Date().getTime() - this.totalBuildTime;
 
-        if ( (<any>compilerOptions).diagnostics ) {
+        if ( this.config.bundlerOptions.verbose ) {
             this.reportStatistics();
         }
 
@@ -230,11 +246,10 @@ export class ProjectBuilder implements IBundleBuilder {
         if ( this.config.bundlerOptions.verbose ) {
             let statisticsReporter = new StatisticsReporter();
 
-            statisticsReporter.reportTitle( "Total build times..." );
-            statisticsReporter.reportTime( "Pre-build time", this.totalPreBuildTime );
+            statisticsReporter.reportTitle( "Build times" );
             statisticsReporter.reportTime( "Compiling time", this.totalCompileTime );
             statisticsReporter.reportTime( "Bundling time", this.totalBundleTime );
-            statisticsReporter.reportTime( "Build time", this.totalBuildTime );
+            statisticsReporter.reportTime( "Total Build time", this.totalBuildTime );
         }
     }
 }

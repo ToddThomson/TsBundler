@@ -30,6 +30,9 @@ export class Project {
         this.bundlerOptions = bundlerOptions || {};
 
         this.config = this.parseProjectConfig();
+        
+        // Add the bundler options to the overall project config
+        this.config.bundlerOptions = this.bundlerOptions;
     }
 
     public getConfig(): ProjectConfig {
@@ -102,7 +105,6 @@ export class Project {
         return {
             success: true,
             configFile: this.configFileName,
-            bundlerOptions: this.bundlerOptions,
             compilerOptions: compilerOptions,
             fileNames: configParseResult.fileNames,
             bundles: bundlesParseResult.bundles
@@ -110,7 +112,13 @@ export class Project {
     }
     
     private readConfigFile( fileName: string ): string {
-        return ts.sys.readFile( fileName );
+        var text = ts.sys.readFile( fileName );
+
+        if ( text === undefined ) {
+            throw new Error( "Configuration file does not exist." );
+        }
+
+        return text;
     }
 
     private getSettingsCompilerOptions( jsonSettings: any, configDirPath: string ): ts.ParsedCommandLine {
