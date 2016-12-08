@@ -8,7 +8,11 @@ import * as tsc from "ts2js";
 import * as stream from "stream";
 
 // Interface Types...
-export { BundlerOptions };
+export interface BundlerOptions {
+    logLevel?: number;
+    verbose?: boolean;
+    outputToDisk?: boolean;
+}
 
 export interface BuildResult {
     errors: ts.Diagnostic[];

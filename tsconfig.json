@@ -22,7 +22,8 @@
     "exclude": [
         "node_modules",
         "dist",
-        "src"
+        "src",
+        "tests"
     ],
     "compileOnSave": false
 }

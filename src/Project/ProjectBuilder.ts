@@ -56,7 +56,7 @@ export class ProjectBuilder implements IBundleBuilder {
             // onBuildCompleted...
 
             if ( this.config.bundlerOptions.outputToDisk ) {
-                if ( buildResult.succeeded ) {
+                if ( buildResult.succeeded() ) {
                     buildResult.bundleOutput.forEach( ( compileResult ) => {
                         if ( !compileResult.emitSkipped ) {
                             compileResult.emitOutput.forEach(( emit ) => {
@@ -107,7 +107,7 @@ export class ProjectBuilder implements IBundleBuilder {
         // Perform the build..
         this.buildWorker( (buildResult) => {
             // onBuildCompleted..
-            if ( buildResult.succeeded ) {
+            if ( buildResult.succeeded() ) {
                 buildResult.bundleOutput.forEach( ( compileResult ) => {
                     if ( !compileResult.emitSkipped ) {
                         compileResult.emitOutput.forEach(( emit ) => {

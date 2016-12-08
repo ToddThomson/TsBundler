@@ -16,6 +16,7 @@
         "noEmit": false
     },
     "files": [
+        "./Ast/Ast.ts",
         "./Bundler/BundleBuilder.ts",
         "./Bundler/BundlePackage.ts",
         "./Bundler/BundleParser.ts",

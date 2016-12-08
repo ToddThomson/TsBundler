@@ -25,7 +25,7 @@
     <OutputPath>.</OutputPath>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <ProjectTypeGuids>{3AF33F2E-1136-4D97-BBB7-1795711AC8B8};{9092AA53-FB77-4645-B42D-1CCCA6BD08BD}</ProjectTypeGuids>
-    <ProjectView>ProjectFiles</ProjectView>
+    <ProjectView>ShowAllFiles</ProjectView>
     <TypeScriptSourceMap>true</TypeScriptSourceMap>
     <TypeScriptModuleKind>CommonJS</TypeScriptModuleKind>
     <EnableTypeScript>true</EnableTypeScript>
@@ -49,6 +49,7 @@
     <Content Include="README.md" />
     <Content Include="tsconfig.json" />
     <TypeScriptCompile Include="run.ts" />
+    <TypeScriptCompile Include="src\Ast\Ast.ts" />
     <TypeScriptCompile Include="src\Bundler\BundleBuilder.ts" />
     <TypeScriptCompile Include="src\Bundler\BundlePackage.ts" />
     <TypeScriptCompile Include="src\Bundler\BundleParser.ts" />
@@ -80,6 +81,7 @@
     <Folder Include="build\tasks\" />
     <Folder Include="src\" />
     <Folder Include="src\Bundler\" />
+    <Folder Include="src\Ast\" />
     <Folder Include="src\Project\" />
     <Folder Include="src\Reporting\" />
     <Folder Include="src\Utils\" />
@@ -89,7 +91,6 @@
     <Compile Include="build\tasks\bundle.js" />
     <Compile Include="build\tasks\build.js" />
     <Compile Include="build\tasks\clean.js" />
-    <Compile Include="build\tasks\watch.js" />
     <Compile Include="gulpfile.js" />
     <Compile Include="tsbundler.js" />
   </ItemGroup>

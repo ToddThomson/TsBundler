@@ -205,19 +205,31 @@ export class BundleBuilder {
     }
 
     private isInheritedBinding( dependencyNode: ts.Node, namedBindings: string[] ): boolean {
+        const typeChecker = this.program.getTypeChecker();
+        
         var dependencySymbol = this.getSymbolFromNode( dependencyNode );
-        var exports = this.program.getTypeChecker().getExportsOfModule( dependencySymbol );
 
-        for ( var exportedSymbol of exports ) {
-            var exportType = this.program.getTypeChecker().getDeclaredTypeOfSymbol( exportedSymbol );
-            var baseTypes = this.program.getTypeChecker().getBaseTypes( <ts.InterfaceType>exportType );
+        if ( dependencySymbol ) {
+            var exports = typeChecker.getExportsOfModule( dependencySymbol );
 
-            for ( var baseType of baseTypes ) {
-                var baseTypeName = baseType.symbol.getName();
+            if ( exports ) {
+                for ( const exportedSymbol of exports ) {
+                    const exportType: ts.Type = typeChecker.getDeclaredTypeOfSymbol( exportedSymbol );
 
-                if ( namedBindings.indexOf( baseTypeName ) >= 0 ) {
-                    Logger.info( "Base class inheritance found", baseTypeName );
-                    return true;
+                    if ( exportType && 
+                        ( exportType.flags & ts.TypeFlags.Object ) && 
+                        ( (<ts.ObjectType>exportType).objectFlags & ( ts.ObjectFlags.Class | ts.ObjectFlags.Interface ) )  ){
+                        const baseTypes = typeChecker.getBaseTypes( <ts.InterfaceType>exportType );
+
+                        for ( var baseType of baseTypes ) {
+                            var baseTypeName = baseType.symbol.getName();
+
+                            if ( namedBindings.indexOf( baseTypeName ) >= 0 ) {
+                                Logger.info( "Base class inheritance found", baseTypeName );
+                                return true;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -352,7 +364,7 @@ export class BundleBuilder {
                         let module = <ts.ModuleDeclaration>node;
 
                         if ( module.name.getText() !== this.bundle.config.package.getPackageNamespace() ) {
-                            if ( module.flags & ts.NodeFlags.Export ) {
+                            if ( module.flags & ts.NodeFlags.ExportContext ) {
                                 Logger.info( "Component namespace not package namespace. Removing export modifier." );
                                 let nodeModifier = module.modifiers[0];
                                 editText = this.whiteOut( nodeModifier.pos, nodeModifier.end, editText );
@@ -360,7 +372,7 @@ export class BundleBuilder {
                         }
                     }
                     else {
-                        if ( node.flags & ts.NodeFlags.Export ) {
+                        if ( node.flags & ts.NodeFlags.ExportContext ) {
                             let exportModifier = node.modifiers[0];
 
                             editText = this.whiteOut( exportModifier.pos, exportModifier.end, editText );
@@ -426,9 +438,23 @@ export class BundleBuilder {
     }
 
     private isAmbientModule( importSymbol: ts.Symbol ): boolean {
-        let declaration = importSymbol.getDeclarations()[0];
+        const declarations = importSymbol.getDeclarations();
+            
+        if ( declarations && declarations.length > 0 ) {
+            const declaration = importSymbol.getDeclarations()[0];
 
-        return ( ( declaration.kind === ts.SyntaxKind.ModuleDeclaration ) && ( ( declaration.flags & ts.NodeFlags.Ambient ) > 0 ) );
+            if ( declaration.kind === ts.SyntaxKind.ModuleDeclaration ) {
+                if ( declaration.modifiers ) {
+                    for ( const modifier of declaration.modifiers ) {
+                        if ( modifier.kind === ts.SyntaxKind.DeclareKeyword ) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     // TJT: Review duplicate code. Move to TsCore pass program as arg.

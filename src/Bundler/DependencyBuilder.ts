@@ -1,4 +1,5 @@
-﻿import { Logger } from "../Reporting/Logger";
+﻿import { Ast } from "../Ast/Ast";
+import { Logger } from "../Reporting/Logger";
 import { Utils } from "../Utils/Utilities";
 import { TsCore } from "../Utils/TsCore";
 
@@ -85,11 +86,16 @@ export class DependencyBuilder {
                         }
                     }
                 }
-                else if ( node.kind === ts.SyntaxKind.ModuleDeclaration && (<ts.ModuleDeclaration>node).name.kind === ts.SyntaxKind.StringLiteral && ( node.flags & ts.NodeFlags.Ambient || file.isDeclarationFile ) ) {
-                    // An AmbientExternalModuleDeclaration declares an external module.
-                    var moduleDeclaration = <ts.ModuleDeclaration>node;
-                    Logger.info( "Processing ambient module declaration: ", moduleDeclaration.name.text );
-                    getImports( (<ts.ModuleDeclaration>node).body );
+                else if ( node.kind === ts.SyntaxKind.ModuleDeclaration ) {
+                    const moduleDeclaration: ts.ModuleDeclaration = <ts.ModuleDeclaration>node;
+                    
+                    if ( ( moduleDeclaration.name.kind === ts.SyntaxKind.StringLiteral ) && 
+                         ( Ast.getModifierFlags( moduleDeclaration ) & ts.ModifierFlags.Ambient || file.isDeclarationFile ) ) {
+                        // An AmbientExternalModuleDeclaration declares an external module.
+                        Logger.info( "Processing ambient module declaration: ", moduleDeclaration.name.text );
+                        
+                        getImports( moduleDeclaration.body );
+                    }
                 }
             });
         };

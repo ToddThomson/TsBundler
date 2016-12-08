@@ -20,7 +20,7 @@ var BundlePackageType;
     BundlePackageType[BundlePackageType["None"] = 0] = "None";
     BundlePackageType[BundlePackageType["Library"] = 1] = "Library";
     BundlePackageType[BundlePackageType["Component"] = 2] = "Component";
-})(BundlePackageType || (BundlePackageType = {}));
+})(BundlePackageType = exports.BundlePackageType || (exports.BundlePackageType = {}));
 var BundlePackage = (function () {
     function BundlePackage(packageType, packageNamespace) {
         this.packageNamespace = undefined;
@@ -35,7 +35,8 @@ var BundlePackage = (function () {
     };
     return BundlePackage;
 }());
-var level = {
+exports.BundlePackage = BundlePackage;
+exports.level = {
     none: 0,
     error: 1,
     warn: 2,
@@ -54,54 +55,55 @@ var Logger = (function () {
     Logger.log = function () {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
         console.log.apply(console, [chalk.gray("[" + this.logName + "]")].concat(args));
     };
     Logger.info = function () {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
-        if (this.logLevel < level.info) {
+        if (this.logLevel < exports.level.info) {
             return;
         }
-        console.log.apply(console, [chalk.gray(("[" + this.logName + "]") + chalk.blue(" INFO: "))].concat(args));
+        console.log.apply(console, [chalk.gray("[" + this.logName + "]" + chalk.blue(" INFO: "))].concat(args));
     };
     Logger.warn = function () {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
-        if (this.logLevel < level.warn) {
+        if (this.logLevel < exports.level.warn) {
             return;
         }
-        console.log.apply(console, [("[" + this.logName + "]") + chalk.yellow(" WARNING: ")].concat(args));
+        console.log.apply(console, ["[" + this.logName + "]" + chalk.yellow(" WARNING: ")].concat(args));
     };
     Logger.error = function () {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
-        if (this.logLevel < level.error) {
+        if (this.logLevel < exports.level.error) {
             return;
         }
-        console.log.apply(console, [("[" + this.logName + "]") + chalk.red(" ERROR: ")].concat(args));
+        console.log.apply(console, ["[" + this.logName + "]" + chalk.red(" ERROR: ")].concat(args));
     };
     Logger.trace = function () {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
-        if (this.logLevel < level.error) {
+        if (this.logLevel < exports.level.error) {
             return;
         }
-        console.log.apply(console, [("[" + this.logName + "]") + chalk.gray(" TRACE: ")].concat(args));
+        console.log.apply(console, ["[" + this.logName + "]" + chalk.gray(" TRACE: ")].concat(args));
     };
-    Logger.logLevel = level.none;
-    Logger.logName = "logger";
     return Logger;
 }());
+Logger.logLevel = exports.level.none;
+Logger.logName = "logger";
+exports.Logger = Logger;
 var Utils;
 (function (Utils) {
     function forEach(array, callback) {
@@ -171,7 +173,7 @@ var Utils;
         return str.substr(0, index) + character + str.substr(index + character.length);
     }
     Utils.replaceAt = replaceAt;
-})(Utils || (Utils = {}));
+})(Utils = exports.Utils || (exports.Utils = {}));
 var TsCore;
 (function (TsCore) {
     function fileExtensionIs(path, extension) {
@@ -272,7 +274,7 @@ var TsCore;
         return path.replace(/\.ts/, ".js");
     }
     TsCore.outputExtension = outputExtension;
-})(TsCore || (TsCore = {}));
+})(TsCore = exports.TsCore || (exports.TsCore = {}));
 var BundleParser = (function () {
     function BundleParser() {
     }
@@ -346,6 +348,7 @@ var BundleParser = (function () {
     };
     return BundleParser;
 }());
+exports.BundleParser = BundleParser;
 var Glob = (function () {
     function Glob() {
     }
@@ -390,6 +393,38 @@ var Glob = (function () {
     };
     return Glob;
 }());
+exports.Glob = Glob;
+var Ast;
+(function (Ast) {
+    function getModifierFlags(node) {
+        var flags = ts.ModifierFlags.None;
+        if (node.modifiers) {
+            for (var _i = 0, _a = node.modifiers; _i < _a.length; _i++) {
+                var modifier = _a[_i];
+                flags |= modifierToFlag(modifier.kind);
+            }
+        }
+        return flags;
+    }
+    Ast.getModifierFlags = getModifierFlags;
+    function modifierToFlag(token) {
+        switch (token) {
+            case ts.SyntaxKind.StaticKeyword: return ts.ModifierFlags.Static;
+            case ts.SyntaxKind.PublicKeyword: return ts.ModifierFlags.Public;
+            case ts.SyntaxKind.ProtectedKeyword: return ts.ModifierFlags.Protected;
+            case ts.SyntaxKind.PrivateKeyword: return ts.ModifierFlags.Private;
+            case ts.SyntaxKind.AbstractKeyword: return ts.ModifierFlags.Abstract;
+            case ts.SyntaxKind.ExportKeyword: return ts.ModifierFlags.Export;
+            case ts.SyntaxKind.DeclareKeyword: return ts.ModifierFlags.Ambient;
+            case ts.SyntaxKind.ConstKeyword: return ts.ModifierFlags.Const;
+            case ts.SyntaxKind.DefaultKeyword: return ts.ModifierFlags.Default;
+            case ts.SyntaxKind.AsyncKeyword: return ts.ModifierFlags.Async;
+            case ts.SyntaxKind.ReadonlyKeyword: return ts.ModifierFlags.Readonly;
+        }
+        return ts.ModifierFlags.None;
+    }
+    Ast.modifierToFlag = modifierToFlag;
+})(Ast = exports.Ast || (exports.Ast = {}));
 var StatisticsReporter = (function () {
     function StatisticsReporter() {
     }
@@ -422,6 +457,7 @@ var StatisticsReporter = (function () {
     };
     return StatisticsReporter;
 }());
+exports.StatisticsReporter = StatisticsReporter;
 var BundleResult = (function () {
     function BundleResult(errors, bundleSource) {
         this.errors = errors;
@@ -438,6 +474,7 @@ var BundleResult = (function () {
     };
     return BundleResult;
 }());
+exports.BundleResult = BundleResult;
 var DependencyBuilder = (function () {
     function DependencyBuilder(host, program) {
         this.moduleImportsByName = {};
@@ -499,11 +536,14 @@ var DependencyBuilder = (function () {
                         }
                     }
                 }
-                else if (node.kind === ts.SyntaxKind.ModuleDeclaration && node.name.kind === ts.SyntaxKind.StringLiteral && (node.flags & ts.NodeFlags.Ambient || file.isDeclarationFile)) {
-                    // An AmbientExternalModuleDeclaration declares an external module.
+                else if (node.kind === ts.SyntaxKind.ModuleDeclaration) {
                     var moduleDeclaration = node;
-                    Logger.info("Processing ambient module declaration: ", moduleDeclaration.name.text);
-                    getImports(node.body);
+                    if ((moduleDeclaration.name.kind === ts.SyntaxKind.StringLiteral) &&
+                        (Ast.getModifierFlags(moduleDeclaration) & ts.ModifierFlags.Ambient || file.isDeclarationFile)) {
+                        // An AmbientExternalModuleDeclaration declares an external module.
+                        Logger.info("Processing ambient module declaration: ", moduleDeclaration.name.text);
+                        getImports(moduleDeclaration.body);
+                    }
                 }
             });
         }
@@ -531,6 +571,7 @@ var DependencyBuilder = (function () {
     };
     return DependencyBuilder;
 }());
+exports.DependencyBuilder = DependencyBuilder;
 var BuildResult = (function () {
     function BuildResult(errors, bundles) {
         this.errors = errors;
@@ -541,6 +582,7 @@ var BuildResult = (function () {
     };
     return BuildResult;
 }());
+exports.BuildResult = BuildResult;
 var DiagnosticsReporter = (function () {
     function DiagnosticsReporter() {
     }
@@ -577,16 +619,18 @@ var DiagnosticsReporter = (function () {
     };
     return DiagnosticsReporter;
 }());
+exports.DiagnosticsReporter = DiagnosticsReporter;
 var BuildStream = (function (_super) {
     __extends(BuildStream, _super);
     function BuildStream(opts) {
-        _super.call(this, { objectMode: true });
+        return _super.call(this, { objectMode: true }) || this;
     }
     BuildStream.prototype._read = function () {
         // Safely do nothing
     };
     return BuildStream;
 }(stream.Readable));
+exports.BuildStream = BuildStream;
 var BundleBuilder = (function () {
     function BundleBuilder(host, program, bundlerOptions) {
         this.dependencyTime = 0;
@@ -623,7 +667,7 @@ var BundleBuilder = (function () {
         // Output tsx for bundle extension if typescript react files found.
         var isBundleTsx = false;
         var allDependencies = {};
-        var _loop_1 = function() {
+        var _loop_1 = function () {
             var fileName = bundle.fileNames[filesKey];
             Logger.info(">>> Processing bundle file:", fileName);
             var bundleSourceFileName = this_1.host.getCanonicalFileName(TsCore.normalizeSlashes(fileName));
@@ -642,14 +686,14 @@ var BundleBuilder = (function () {
             var moduleDependencies = dependencyBuilder.getSourceFileDependencies(bundleSourceFile);
             this_1.dependencyTime += new Date().getTime() - startTime;
             // Merge current bundle file dependencies into all dependencies
-            for (mergeKey in moduleDependencies) {
+            for (var mergeKey in moduleDependencies) {
                 if (!Utils.hasProperty(allDependencies, mergeKey)) {
                     allDependencies[mergeKey] = moduleDependencies[mergeKey];
                 }
             }
             startTime = new Date().getTime();
             Logger.info("Traversing module dependencies for bundle: ", bundleSourceFile.fileName);
-            for (moduleFileName in moduleDependencies) {
+            for (var moduleFileName in moduleDependencies) {
                 Logger.info("Walking dependency nodes for module: ", moduleFileName);
                 moduleDependencyNodes = moduleDependencies[moduleFileName];
                 moduleDependencyNodes.forEach(function (moduleDependencyNode) {
@@ -691,11 +735,11 @@ var BundleBuilder = (function () {
             this_1.addSourceFile(bundleSourceFile);
             this_1.dependencyWalkTime += new Date().getTime() - startTime;
         };
-        var this_1 = this;
-        var mergeKey, moduleFileName, moduleDependencyNodes;
+        var this_1 = this, moduleDependencyNodes;
         for (var filesKey in bundle.fileNames) {
             var state_1 = _loop_1();
-            if (typeof state_1 === "object") return state_1.value;
+            if (typeof state_1 === "object")
+                return state_1.value;
         }
         // The text for our bundle is the concatenation of import statements and source code
         var bundleText = this.bundleImportText;
@@ -734,18 +778,27 @@ var BundleBuilder = (function () {
         }
     };
     BundleBuilder.prototype.isInheritedBinding = function (dependencyNode, namedBindings) {
+        var typeChecker = this.program.getTypeChecker();
         var dependencySymbol = this.getSymbolFromNode(dependencyNode);
-        var exports = this.program.getTypeChecker().getExportsOfModule(dependencySymbol);
-        for (var _i = 0, exports_1 = exports; _i < exports_1.length; _i++) {
-            var exportedSymbol = exports_1[_i];
-            var exportType = this.program.getTypeChecker().getDeclaredTypeOfSymbol(exportedSymbol);
-            var baseTypes = this.program.getTypeChecker().getBaseTypes(exportType);
-            for (var _a = 0, baseTypes_1 = baseTypes; _a < baseTypes_1.length; _a++) {
-                var baseType = baseTypes_1[_a];
-                var baseTypeName = baseType.symbol.getName();
-                if (namedBindings.indexOf(baseTypeName) >= 0) {
-                    Logger.info("Base class inheritance found", baseTypeName);
-                    return true;
+        if (dependencySymbol) {
+            var exports = typeChecker.getExportsOfModule(dependencySymbol);
+            if (exports) {
+                for (var _i = 0, exports_1 = exports; _i < exports_1.length; _i++) {
+                    var exportedSymbol = exports_1[_i];
+                    var exportType = typeChecker.getDeclaredTypeOfSymbol(exportedSymbol);
+                    if (exportType &&
+                        (exportType.flags & ts.TypeFlags.Object) &&
+                        (exportType.objectFlags & (ts.ObjectFlags.Class | ts.ObjectFlags.Interface))) {
+                        var baseTypes = typeChecker.getBaseTypes(exportType);
+                        for (var _a = 0, baseTypes_1 = baseTypes; _a < baseTypes_1.length; _a++) {
+                            var baseType = baseTypes_1[_a];
+                            var baseTypeName = baseType.symbol.getName();
+                            if (namedBindings.indexOf(baseTypeName) >= 0) {
+                                Logger.info("Base class inheritance found", baseTypeName);
+                                return true;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -851,7 +904,7 @@ var BundleBuilder = (function () {
                     if (node.kind === ts.SyntaxKind.ModuleDeclaration) {
                         var module_1 = node;
                         if (module_1.name.getText() !== _this.bundle.config.package.getPackageNamespace()) {
-                            if (module_1.flags & ts.NodeFlags.Export) {
+                            if (module_1.flags & ts.NodeFlags.ExportContext) {
                                 Logger.info("Component namespace not package namespace. Removing export modifier.");
                                 var nodeModifier = module_1.modifiers[0];
                                 editText = _this.whiteOut(nodeModifier.pos, nodeModifier.end, editText);
@@ -859,7 +912,7 @@ var BundleBuilder = (function () {
                         }
                     }
                     else {
-                        if (node.flags & ts.NodeFlags.Export) {
+                        if (node.flags & ts.NodeFlags.ExportContext) {
                             var exportModifier = node.modifiers[0];
                             editText = _this.whiteOut(exportModifier.pos, exportModifier.end, editText);
                         }
@@ -909,8 +962,21 @@ var BundleBuilder = (function () {
         return ((declaration.kind === ts.SyntaxKind.SourceFile) && !(declaration.isDeclarationFile));
     };
     BundleBuilder.prototype.isAmbientModule = function (importSymbol) {
-        var declaration = importSymbol.getDeclarations()[0];
-        return ((declaration.kind === ts.SyntaxKind.ModuleDeclaration) && ((declaration.flags & ts.NodeFlags.Ambient) > 0));
+        var declarations = importSymbol.getDeclarations();
+        if (declarations && declarations.length > 0) {
+            var declaration = importSymbol.getDeclarations()[0];
+            if (declaration.kind === ts.SyntaxKind.ModuleDeclaration) {
+                if (declaration.modifiers) {
+                    for (var _i = 0, _a = declaration.modifiers; _i < _a.length; _i++) {
+                        var modifier = _a[_i];
+                        if (modifier.kind === ts.SyntaxKind.DeclareKeyword) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     };
     // TJT: Review duplicate code. Move to TsCore pass program as arg.
     BundleBuilder.prototype.getSymbolFromNode = function (node) {
@@ -945,6 +1011,7 @@ var BundleBuilder = (function () {
     };
     return BundleBuilder;
 }());
+exports.BundleBuilder = BundleBuilder;
 var Project = (function () {
     function Project(configFilePath, bundlerOptions) {
         this.configFilePath = configFilePath;
@@ -1081,6 +1148,7 @@ var Project = (function () {
     };
     return Project;
 }());
+exports.Project = Project;
 var ProjectBuilder = (function () {
     function ProjectBuilder(project) {
         // TODO: move to BuildStatistics
@@ -1102,7 +1170,7 @@ var ProjectBuilder = (function () {
         this.buildWorker(function (buildResult) {
             // onBuildCompleted...
             if (_this.config.bundlerOptions.outputToDisk) {
-                if (buildResult.succeeded) {
+                if (buildResult.succeeded()) {
                     buildResult.bundleOutput.forEach(function (compileResult) {
                         if (!compileResult.emitSkipped) {
                             compileResult.emitOutput.forEach(function (emit) {
@@ -1143,7 +1211,7 @@ var ProjectBuilder = (function () {
         // Perform the build..
         this.buildWorker(function (buildResult) {
             // onBuildCompleted..
-            if (buildResult.succeeded) {
+            if (buildResult.succeeded()) {
                 buildResult.bundleOutput.forEach(function (compileResult) {
                     if (!compileResult.emitSkipped) {
                         compileResult.emitOutput.forEach(function (emit) {
@@ -1255,7 +1323,7 @@ var ProjectBuilder = (function () {
     };
     return ProjectBuilder;
 }());
-// Interface Types...
+exports.ProjectBuilder = ProjectBuilder;
 ;
 var TsBundler;
 (function (TsBundler) {
