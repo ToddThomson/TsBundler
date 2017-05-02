@@ -2,7 +2,7 @@
 import * as stream from "stream";
 import { BuildResult } from "./BuildResult";
 
-export interface IBundleBuilder {
+export interface BundleBuilder {
     build( buildCompleted: ( result: BuildResult ) => void ): void;
     src(): stream.Readable;    
 }

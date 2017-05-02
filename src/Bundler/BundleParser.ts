@@ -1,24 +1,13 @@
-﻿import { BundlePackage, BundlePackageType } from "./BundlePackage";
+﻿import { Bundle } from "./Bundle";
+import { BundlePackage } from "./BundlePackage";
+import { PackageType } from "./PackageType";
+
 import { Logger } from "../Reporting/Logger";
 import { Utils } from "../Utils/Utilities";
 import { TsCore } from "../Utils/TsCore";
 
 import * as ts from "typescript";
 import * as path from "path";
-
-export interface BundleConfig {
-    sourceMap?: boolean;
-    declaration?: boolean;
-    outDir?: string;
-    minify?: boolean;
-    package?: BundlePackage;
-}
-
-export interface Bundle {
-    name: string;
-    fileNames: string[];
-    config: BundleConfig;
-}
 
 export interface ParsedBundlesResult {
     bundles: Bundle[];
@@ -84,13 +73,13 @@ export class BundleParser {
 
             // TODO: Add diagnostics for input errors..
 
-            let bundlePackageType: BundlePackageType = BundlePackageType.None;
+            let bundlePackageType: PackageType = PackageType.None;
             let bundlePackageNamespace: string = undefined;
 
-            let packageTypeMap: ts.MapLike<BundlePackageType> = {
-                "none": BundlePackageType.None,
-                "library": BundlePackageType.Library,
-                "component": BundlePackageType.Component
+            let packageTypeMap: ts.MapLike<PackageType> = {
+                "none": PackageType.None,
+                "library": PackageType.Library,
+                "component": PackageType.Component
             };
 
             if ( Utils.hasProperty( config, "package" ) ) {

@@ -1,33 +1,26 @@
-﻿import { Project } from "./Project/Project";
+﻿import * as Bundler from "./Bundler/BundlerModule";
+
+import { Project } from "./Project/Project";
 import { ProjectBuilder } from "./Project/ProjectBuilder";
-import { BundlerOptions } from "./Bundler/BundlerOptions";
+import { BundleBuilder } from "./Project/BundleBuilder";
+import { BuildResult } from "./Project/BuildResult";
 import { Logger } from "./Reporting/Logger";
 
 import * as ts from "typescript";
 import * as tsc from "ts2js";
 import * as stream from "stream";
 
-// Interface Types...
-export interface BundlerOptions {
-    logLevel?: number;
-    verbose?: boolean;
-    outputToDisk?: boolean;
-}
+// Interfaces
+export { ProjectBuilder } from "./Project/ProjectBuilder";
+export { BundlerOptions } from "./Bundler/BundlerModule";
+export { BuildResult } from "./Project/BuildResult";
 
-export interface BuildResult {
-    errors: ts.Diagnostic[];
-    bundleOutput?: tsc.CompilerResult[];
-    succeeded(): boolean;
-};
+//export interface BundleBuilder {
+//        build( buildCompleted: ( result: BuildResult ) => void ): void;
+//        src(): stream.Readable;    
+//    };
 
-export namespace TsBundler {
-
-    export interface BundleBuilder {
-        build( buildCompleted: ( result: BuildResult ) => void ): void;
-        src(): stream.Readable;    
-    };
-
-    export function builder( configFilePath: string, bundlerOptions?: BundlerOptions, buildCompleted?: ( result: BuildResult ) => void ): BundleBuilder {
+export function builder( configFilePath: string, bundlerOptions?: Bundler.BundlerOptions, buildCompleted?: ( result: BuildResult ) => void ): BundleBuilder {
 
         bundlerOptions = bundlerOptions || {};
         bundlerOptions.logLevel = bundlerOptions.logLevel || 0;
@@ -43,7 +36,6 @@ export namespace TsBundler {
 
         return projectBuilder;
     }
-}
 
 // TJT: Comment out when testing locally
-module.exports = TsBundler;
+//module.exports = TsBundler;

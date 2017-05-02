@@ -4,7 +4,7 @@
         "target": "es5",
         "module": "commonjs",
         "moduleResolution": "node",
-        "declaration": false,
+        "declaration": true,
         "diagnostics": true,
         "listFiles": false,
         "listEmittedFiles": true,
@@ -17,12 +17,19 @@
     },
     "files": [
         "./Ast/Ast.ts",
+
+        "./Bundler/BundlerModule.ts",
+        "./Bundler/Bundle.ts",
         "./Bundler/BundleBuilder.ts",
+        "./Bundler/BundleConfig.ts",
         "./Bundler/BundlePackage.ts",
         "./Bundler/BundleParser.ts",
-        "./Bundler/BundleResult.ts",
+        "./Bundler/BundleBuildResult.ts",
         "./Bundler/BundlerOptions.ts",
         "./Bundler/DependencyBuilder.ts",
+        "./Bundler/ModuleDescriptor.ts",
+        "./Bundler/ModuleContainer.ts",
+        "./Bundler/PackageType.ts",
 
         "./Project/BuildStatistics.ts",
         "./Project/BuildStream.ts",
@@ -31,6 +38,7 @@
         "./Project/BuildResult.ts",
         "./Project/ProjectConfig.ts",
         "./Project/Project.ts",
+        "./Project/ProjectModule.ts",
 
         "./Reporting/DiagnosticsReporter.ts",
         "./Reporting/Logger.ts",
@@ -44,6 +52,7 @@
         "./Utils/Utilities.ts",
 
         "./TsBundler.ts"
+
     ],
     "bundles": {
         "tsbundler": {

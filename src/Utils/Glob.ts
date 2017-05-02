@@ -18,8 +18,8 @@ export class Glob {
         if ( minimatchSet.length > 1 )
             return true;
 
-        for ( var j = 0; j < minimatchSet[0].length; j++ ) {
-            if ( typeof minimatchSet[0][j] !== 'string' )
+        for ( var j = 0; j < minimatchSet[ 0 ].length; j++ ) {
+            if ( typeof minimatchSet[ 0 ][ j ] !== 'string' )
                 return true;
         }
 

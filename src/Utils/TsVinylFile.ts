@@ -1,5 +1,5 @@
-﻿import * as ts from "typescript";
-import File = require( "vinyl" );
+﻿import * as ts from "typescript"
+import File = require( "vinyl" )
 
 export class VinylFile extends File {
 

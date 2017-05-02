@@ -1,13 +1,18 @@
-﻿import { StatisticsReporter } from "../Reporting/StatisticsReporter";
-import { Logger } from "../Reporting/Logger";
-import { BundleParser, Bundle } from "./BundleParser";
-import { BundlePackage, BundlePackageType } from "./BundlePackage";
-import { BundlerOptions } from "./BundlerOptions";
-import { BundleResult } from "./BundleResult";
-import { DependencyBuilder } from "./DependencyBuilder";
-import { Glob } from "../Utils/Glob";
-import { Utils } from "../Utils/Utilities";
-import { TsCore } from "../Utils/TsCore";
+﻿import { StatisticsReporter } from "../Reporting/StatisticsReporter"
+import { Logger } from "../Reporting/Logger"
+import { Bundle } from "./Bundle"
+import { BundleParser } from "./BundleParser"
+import { BundlePackage } from "./BundlePackage"
+import { PackageType } from "./PackageType"
+import { BundlerOptions } from "./BundlerOptions"
+import { BundleBuildResult } from "./BundleBuildResult"
+import { DependencyBuilder } from "./DependencyBuilder"
+import { ModuleDescriptor } from "./ModuleDescriptor"
+import { ModuleContainer } from "./ModuleContainer"
+import { Glob } from "../Utils/Glob"
+import { Utils } from "../Utils/Utilities"
+import { TsCore } from "../Utils/TsCore"
+import { Ast } from "../Ast/Ast"
 
 import * as ts from "typescript";
 import * as fs from "fs";
@@ -39,7 +44,7 @@ export class BundleBuilder {
         this.options = bundlerOptions;
     }
 
-    public build( bundle: Bundle ): BundleResult {
+    public build( bundle: Bundle ): BundleBuildResult {
         this.bundle = bundle;
         this.buildTime = new Date().getTime();
 
@@ -67,11 +72,11 @@ export class BundleBuilder {
 
         var isBundleTsx = false;
 
-        let allDependencies: ts.MapLike<ts.Node[]> = {};
+        let allDependencies: ModuleDescriptor[] = [];
 
         for ( var filesKey in bundle.fileNames ) {
             let fileName = bundle.fileNames[filesKey];
-            Logger.info( ">>> Processing bundle file:", fileName );
+            Logger.info( ">>> Processing bundle entry input file:", fileName );
 
             let bundleSourceFileName = this.host.getCanonicalFileName( TsCore.normalizeSlashes( fileName ) );
             Logger.info( "BundleSourceFileName:", bundleSourceFileName );
@@ -81,7 +86,7 @@ export class BundleBuilder {
             if ( !bundleSourceFile ) {
                 let diagnostic = TsCore.createDiagnostic( { code: 6060, category: ts.DiagnosticCategory.Error, key: "Bundle_source_file_0_not_found_6060", message: "Bundle source file '{0}' not found." }, bundleSourceFileName );
 
-                return new BundleResult( [diagnostic] );
+                return new BundleBuildResult( [diagnostic] );
             }
 
             // Check for TSX
@@ -92,65 +97,34 @@ export class BundleBuilder {
             let startTime = new Date().getTime();
 
             // Get bundle source file module dependencies...
-            let moduleDependencies = dependencyBuilder.getSourceFileDependencies( bundleSourceFile );
+            let bundleModuleContainer = dependencyBuilder.getSourceFileDependencies( bundleSourceFile );
+            
+            // Create a dependencies lookup map
+            //const bundleDependenciesLookup: ts.MapLike<ModuleDescriptor> = {};
+                
+            //for ( var i = 0, len = bundleModuleContainer.getModules().length; i < len; i++ ) {
+            //    bundleDependenciesLookup[ bundleModuleContainer.getModules()[ i ].getFileName() ] = bundleModuleContainer.getModules()[ i ];
+            //}
 
             this.dependencyTime += new Date().getTime() - startTime;
 
             // Merge current bundle file dependencies into all dependencies
-            for ( var mergeKey in moduleDependencies ) {
-                if ( !Utils.hasProperty( allDependencies, mergeKey ) ) {
-                    allDependencies[ mergeKey ] = moduleDependencies[ mergeKey ];
-                }
-            }
+            // TJT: FIXME!
+
+            //for ( var mergeKey in moduleDependencies ) {
+            //    if ( !Utils.hasProperty( allDependencies, mergeKey ) ) {
+            //        allDependencies[ mergeKey ] = moduleDependencies[ mergeKey ];
+            //    }
+            //}
 
             startTime = new Date().getTime();
             
-            Logger.info( "Traversing module dependencies for bundle: ", bundleSourceFile.fileName );
+            Logger.info( "Traversing dependencies for bundle: ", bundleSourceFile.fileName );
             
-            for ( var moduleFileName in moduleDependencies ) {
-                Logger.info( "Walking dependency nodes for module: ", moduleFileName );
-                var moduleDependencyNodes = moduleDependencies[ moduleFileName ];
+            this.processModuleContainer( bundleModuleContainer );
 
-                moduleDependencyNodes.forEach( moduleDependencyNode => {
-                    // Obtain the source file from the dependency node ( usually an import statement )
-
-                    // REVIEW: Combine these.
-                    var dependencySymbol = this.getSymbolFromNode( moduleDependencyNode );
-                    var dependencyFile = TsCore.getSourceFileFromSymbol( dependencySymbol );
-
-                    if ( dependencyFile && !dependencyFile.isDeclarationFile ) {
-                        let dependencyFileName = this.host.getCanonicalFileName( dependencyFile.fileName );
-                        let dependencyNodes = moduleDependencies[ dependencyFileName ];
-
-                        if ( dependencyNodes ) {
-                            this.processModuleDependencies( moduleDependencyNode, dependencyNodes );
-                        }
-
-                        if ( !Utils.hasProperty( this.bundleImportedFiles, dependencyFileName ) ) {
-                            this.addSourceFile( dependencyFile );
-                        }
-                    }
-                    else {
-                        if ( moduleDependencyNode.kind === ts.SyntaxKind.ImportEqualsDeclaration ) {
-                            // For ImportEqualsDeclarations we emit the import declaration
-                            // if it hasn't already been added to the bundle.
-
-                            // Get the import and module names
-                            let importName = ( <ts.ImportEqualsDeclaration>moduleDependencyNode ).name.text;
-                            var moduleName = this.getImportModuleName( <ts.ImportEqualsDeclaration>moduleDependencyNode );
-
-                            if ( this.addModuleImport( moduleName, importName ) ) {
-                                this.emitModuleImportDeclaration( moduleDependencyNode.getText() );
-                            }
-                        }
-                        else {
-                            // ImportDeclaration kind..
-                            if ( moduleDependencyNode.kind === ts.SyntaxKind.ImportDeclaration ) {
-                                this.writeImportDeclaration( <ts.ImportDeclaration>moduleDependencyNode );
-                            }
-                        }
-                    }
-                });
+            for ( var childContainer of bundleModuleContainer.getChildren() ) {
+                this.processModuleContainer( childContainer );
             }
 
             // Finally, add bundle source file
@@ -159,10 +133,10 @@ export class BundleBuilder {
             this.dependencyWalkTime += new Date().getTime() - startTime;
         }
 
-        // The text for our bundle is the concatenation of import statements and source code
+        // The text for our bundle is the concatenation of import source file text
         let bundleText = this.bundleImportText;
 
-        if ( bundle.config.package.getPackageType() === BundlePackageType.Library ) {
+        if ( bundle.config.package.getPackageType() === PackageType.Library ) {
             // Wrap the bundle in an exported namespace with the bundle name
             bundleText += "export namespace " + bundle.config.package.getPackageNamespace() + " {\r\n";
             bundleText += this.bundleCodeText;
@@ -181,7 +155,70 @@ export class BundleBuilder {
             this.reportStatistics();
         }
 
-        return new BundleResult( [], bundleFile );
+        return new BundleBuildResult( [], bundleFile );
+    }
+
+    private processModuleContainer( moduleContainer: ModuleContainer ) {
+        const isGeneratedNamespace = moduleContainer.isGeneratedNamespace();
+        
+        if ( isGeneratedNamespace ) {
+            // Wrap the bundle module container in an exported namespace with the bundle name
+            this.bundleCodeText += "export namespace " + moduleContainer.getName() + " {\r\n";
+        }
+
+        var t = moduleContainer.getModules();
+
+        for ( var moduleDescriptor of moduleContainer.getModules() ) {
+            Logger.info( "Walking dependency nodes for module: ", moduleDescriptor.getFileName() );
+
+            //var moduleDependencyNodes = moduleDesciptor.getDependencies();
+
+            var moduleDependencyNode = moduleDescriptor.getNode();
+            
+            //forEach( moduleDependencyNode => {
+            //var dependencySymbol = this.getSymbolFromNode( moduleDependencyNode );
+                
+            var dependencyFile = moduleDescriptor.getSourceFile();// TsCore.getSourceFileFromSymbol( dependencySymbol );
+
+            if ( !dependencyFile.isDeclarationFile ) {
+                let dependencyFileName = this.host.getCanonicalFileName( dependencyFile.fileName );
+                let dependencyNodes = undefined; //bundleDependenciesLookup[ moduleDependencies.getFileName() ].nodes;
+
+                if ( dependencyNodes ) {
+                    this.processModuleDependencies( moduleDependencyNode, dependencyNodes );
+                }
+
+                if ( !Utils.hasProperty( this.bundleImportedFiles, dependencyFileName ) ) {
+                    this.addSourceFile( dependencyFile );
+                }
+            }
+            else {
+                if ( moduleDependencyNode.kind === ts.SyntaxKind.ImportEqualsDeclaration ) {
+                    // For ImportEqualsDeclarations we emit the import declaration
+                    // if it hasn't already been added to the bundle.
+
+                    // Get the import and module names
+                    let importName = ( <ts.ImportEqualsDeclaration>moduleDependencyNode ).name.text;
+                    var moduleName = this.getImportModuleName( <ts.ImportEqualsDeclaration>moduleDependencyNode );
+
+                    if ( this.addModuleImport( moduleName, importName ) ) {
+                        this.emitModuleImportDeclaration( moduleDependencyNode.getText() );
+                    }
+                }
+                else {
+                    // ImportDeclaration kind..
+                    if ( moduleDependencyNode.kind === ts.SyntaxKind.ImportDeclaration ) {
+                        this.writeImportDeclaration( <ts.ImportDeclaration>moduleDependencyNode );
+                    }
+                }
+            }
+            //});
+        }
+
+        if ( isGeneratedNamespace ) {
+            // Close the bundle module container
+            this.bundleCodeText += " \r\n}";
+        }
     }
 
     private processModuleDependencies( moduleDependencyNode: ts.Node, dependencyNodes: ts.Node[] ) {
@@ -192,12 +229,14 @@ export class BundleBuilder {
             if ( dependencyFile && !dependencyFile.isDeclarationFile ) {
                 let dependencyFileName = this.host.getCanonicalFileName( dependencyFile.fileName );
 
-                var dependencyBindings = this.getNamedBindingsFromImport( <ts.ImportDeclaration>dependencyNode );
+                if ( dependencyNode.kind === ts.SyntaxKind.ImportDeclaration ) {
+                    let dependencyBindings = this.getNamedBindingsFromImport( <ts.ImportDeclaration>dependencyNode );
                 
-                if ( this.isInheritedBinding( moduleDependencyNode, dependencyBindings ) ) {
-                    // Add the dependency file to the bundle now if it is required for inheritance. 
-                    if ( !Utils.hasProperty( this.bundleImportedFiles, dependencyFileName ) ) {
+                    if ( this.isInheritedBinding( moduleDependencyNode, dependencyBindings ) ) {
+                        // Add the dependency file to the bundle now if it is required for inheritance. 
+                        if ( !Utils.hasProperty( this.bundleImportedFiles, dependencyFileName ) ) {
                             this.addSourceFile( dependencyFile );
+                        }
                     }
                 }
             }
@@ -344,28 +383,26 @@ export class BundleBuilder {
 
         ts.forEachChild( file, node => {
             if ( node.kind === ts.SyntaxKind.ImportDeclaration || node.kind === ts.SyntaxKind.ImportEqualsDeclaration || node.kind === ts.SyntaxKind.ExportDeclaration ) {
-                Logger.info( "processImportStatements() found import" );
                 let moduleNameExpression = TsCore.getExternalModuleName( node );
 
                 if ( moduleNameExpression && moduleNameExpression.kind === ts.SyntaxKind.StringLiteral ) {
 
                     let moduleSymbol = this.program.getTypeChecker().getSymbolAtLocation( moduleNameExpression );
 
-                    if ( ( moduleSymbol ) && ( this.isSourceCodeModule( moduleSymbol ) || this.isAmbientModule ) ) {
-                        Logger.info( "processImportStatements() removing code module symbol." );
+                    if ( ( moduleSymbol ) && ( Ast.isSourceCodeModule( moduleSymbol ) || Ast.isAmbientModule ) ) {
                         editText = this.whiteOut( node.pos, node.end, editText );
                     }
                 }
             }
             else {
-                if ( this.bundle.config.package.getPackageType() === BundlePackageType.Component ) {
+                if ( this.bundle.config.package.getPackageType() === PackageType.Component ) {
                     if ( node.kind === ts.SyntaxKind.ModuleDeclaration ) {
 
                         let module = <ts.ModuleDeclaration>node;
 
                         if ( module.name.getText() !== this.bundle.config.package.getPackageNamespace() ) {
                             if ( module.flags & ts.NodeFlags.ExportContext ) {
-                                Logger.info( "Component namespace not package namespace. Removing export modifier." );
+                                Logger.info( "Component bundle. Module name != package namespace. Removing export modifier." );
                                 let nodeModifier = module.modifiers[0];
                                 editText = this.whiteOut( nodeModifier.pos, nodeModifier.end, editText );
                             }
@@ -373,8 +410,8 @@ export class BundleBuilder {
                     }
                     else {
                         if ( node.flags & ts.NodeFlags.ExportContext ) {
+                            Logger.info( "Removing export modifier for non module declaration." );
                             let exportModifier = node.modifiers[0];
-
                             editText = this.whiteOut( exportModifier.pos, exportModifier.end, editText );
                         }
                     }
@@ -408,7 +445,7 @@ export class BundleBuilder {
     private addSourceFile( file: ts.SourceFile ) {
         Logger.info( "Entering addSourceFile() with: ", file.fileName );
 
-        if ( this.isSourceCodeFile( file ) ) {
+        if ( Ast.isSourceCodeFile( file ) ) {
             // Before adding the source text, we must white out non-external import statements and
             // white out export modifiers where applicable
             let editText = this.processImportExports( file );
@@ -427,36 +464,15 @@ export class BundleBuilder {
         }
     }
 
-    private isSourceCodeFile( file: ts.SourceFile ): boolean {
-        return ( file.kind === ts.SyntaxKind.SourceFile && !file.isDeclarationFile );
+    private hasNamespaceAnnotation( symbol: ts.Symbol ) {
+        // Scan through the symbol documentation for our @bundlenamespace annotation
+        const comments: ts.SymbolDisplayPart[] = symbol.getDocumentationComment();
+
+        return Utils.forEach( comments, ( comment: ts.SymbolDisplayPart ) => {
+            return comment.text.indexOf("@bundlemodule") >= 0;
+        });
     }
-
-    private isSourceCodeModule( importSymbol: ts.Symbol ): boolean {
-        let declaration = importSymbol.getDeclarations()[0];
-
-        return ( ( declaration.kind === ts.SyntaxKind.SourceFile ) && !( (<ts.SourceFile>declaration).isDeclarationFile ) );
-    }
-
-    private isAmbientModule( importSymbol: ts.Symbol ): boolean {
-        const declarations = importSymbol.getDeclarations();
-            
-        if ( declarations && declarations.length > 0 ) {
-            const declaration = importSymbol.getDeclarations()[0];
-
-            if ( declaration.kind === ts.SyntaxKind.ModuleDeclaration ) {
-                if ( declaration.modifiers ) {
-                    for ( const modifier of declaration.modifiers ) {
-                        if ( modifier.kind === ts.SyntaxKind.DeclareKeyword ) {
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-
-        return false;
-    }
-
+    
     // TJT: Review duplicate code. Move to TsCore pass program as arg.
     private getSymbolFromNode( node: ts.Node ): ts.Symbol {
         let moduleNameExpr = TsCore.getExternalModuleName( node );
@@ -469,11 +485,13 @@ export class BundleBuilder {
     }
 
     private getNamedBindingsFromImport( node: ts.ImportDeclaration ): string[] {
+        
         const bindingNames: string[] = [];
-        const namedBindings = node.importClause.namedBindings;
 
-        if (namedBindings) {
-            switch (namedBindings.kind) {
+        if ( ( node.kind === ts.SyntaxKind.ImportDeclaration ) && node.importClause.namedBindings ) {
+            const namedBindings = node.importClause.namedBindings;
+
+            switch ( namedBindings.kind ) {
                 case ts.SyntaxKind.NamespaceImport:
                     break;
 

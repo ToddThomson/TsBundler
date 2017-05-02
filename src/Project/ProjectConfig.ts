@@ -1,14 +1,12 @@
 ﻿import * as ts from "typescript";
-
-import { Bundle } from "../Bundler/BundleParser";
-import { BundlerOptions } from "../Bundler/BundlerOptions";
+import * as Bundler from "../Bundler/BundlerModule";
 
 export interface ProjectConfig {
     success: boolean;
     configFile?: string;
-    bundlerOptions?: BundlerOptions;
+    bundlerOptions?: Bundler.BundlerOptions;
     compilerOptions?: ts.CompilerOptions;
     fileNames?: string[];
-    bundles?: Bundle[];
+    bundles?: Bundler.Bundle[];
     errors?: ts.Diagnostic[];
 }

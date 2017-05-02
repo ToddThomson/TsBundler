@@ -1,32 +1,28 @@
-﻿import { DiagnosticsReporter } from "../Reporting/DiagnosticsReporter";
-import { BuildResult } from "./BuildResult";
-import { BuildStream } from "./BuildStream";
-import { BundleBuilder } from "../Bundler/BundleBuilder";
-import { BundlerOptions } from "../Bundler/BundlerOptions";
-import { BundleFile, BundleResult } from "../Bundler/BundleResult";
-import { Project } from "./Project";
-import { ProjectConfig } from "./ProjectConfig";
-import { IBundleBuilder } from "./BundleBuilder";
-import { StatisticsReporter } from "../Reporting/StatisticsReporter";
-import { Logger } from "../Reporting/Logger";
-import { BundleParser, Bundle } from "../Bundler/BundleParser";
-import { Glob } from "../Utils/Glob";
-import { TsCore } from "../Utils/TsCore";
-import { Utils } from "../Utils/Utilities";
+﻿import { DiagnosticsReporter } from "../Reporting/DiagnosticsReporter"
+import { ProjectBuildResult, BuildResult } from "./BuildResult"
+import { BuildStream } from "./BuildStream"
+import { BundleBuilder } from "./BundleBuilder"
+import { Project } from "./Project"
+import { ProjectConfig } from "./ProjectConfig"
+import { StatisticsReporter } from "../Reporting/StatisticsReporter"
+import { Logger } from "../Reporting/Logger"
+import { Glob } from "../Utils/Glob"
+import { TsCore } from "../Utils/TsCore"
+import { Utils } from "../Utils/Utilities"
 
-import * as ts2js from "ts2js";
-import * as tsMinifier from "tsminifier";
-import * as ts from "typescript";
-import * as _ from "lodash";
-import * as fs from "fs";
-import * as path from "path";
-import * as chalk from "chalk";
-import * as stream from "stream";
-import * as gutil from "gulp-util";
-import File = require( "vinyl" );
+import * as Bundler from "../Bundler/BundlerModule"
+import * as ts2js from "ts2js"
+import * as tsMinifier from "tsminifier"
+import * as ts from "typescript"
+import * as _ from "lodash"
+import * as fs from "fs"
+import * as path from "path"
+import * as chalk from "chalk"
+import * as stream from "stream"
+import * as gutil from "gulp-util"
+import File = require( "vinyl" )
 
-
-export class ProjectBuilder implements IBundleBuilder {
+export class ProjectBuilder implements BundleBuilder {
     private project: Project;
     private config: ProjectConfig;
 
@@ -41,14 +37,14 @@ export class ProjectBuilder implements IBundleBuilder {
     }
 
     public build( buildCompleted: ( result: BuildResult ) => void ): void {
-
+        // Configuration errors?
         if ( !this.config.success ) {
             
             if ( this.config.bundlerOptions.verbose ) {
                 DiagnosticsReporter.reportDiagnostics( this.config.errors );
             }
 
-            return buildCompleted( new BuildResult( this.config.errors ) );
+            return buildCompleted( new ProjectBuildResult( this.config.errors ) );
         }
 
         // Perform the build..
@@ -57,7 +53,7 @@ export class ProjectBuilder implements IBundleBuilder {
 
             if ( this.config.bundlerOptions.outputToDisk ) {
                 if ( buildResult.succeeded() ) {
-                    buildResult.bundleOutput.forEach( ( compileResult ) => {
+                    buildResult.bundleCompilerResults.forEach( ( compileResult ) => {
                         if ( !compileResult.emitSkipped ) {
                             compileResult.emitOutput.forEach(( emit ) => {
                                 if ( !emit.emitSkipped ) {
@@ -98,21 +94,30 @@ export class ProjectBuilder implements IBundleBuilder {
                 plugin: "TsBundler",
                 message: "Invalid typescript configuration file" + configFileName 
             });
-            
-            //throw new Error( "Invalid typescript configuration file" + configFileName  );
         }
 
         var outputStream = new BuildStream();
+        var vinylFile: File;
 
         // Perform the build..
-        this.buildWorker( (buildResult) => {
-            // onBuildCompleted..
+        this.buildWorker( ( buildResult ) => {
+            // onBuildCompleted...
+
+            // Emit bundle source files, if any
+            if ( buildResult.bundleBuilderResults ) {
+                buildResult.bundleBuilderResults.forEach( ( bundleBuildResult ) => {
+                    var bundleSource = bundleBuildResult.getBundleSource();
+                    vinylFile = new File({ path: bundleSource.path, contents: new Buffer( bundleSource.text )})
+                    outputStream.push( vinylFile );
+                });
+            }
+
+            // Emit bundle compilation results...
             if ( buildResult.succeeded() ) {
-                buildResult.bundleOutput.forEach( ( compileResult ) => {
+                buildResult.bundleCompilerResults.forEach( ( compileResult ) => {
                     if ( !compileResult.emitSkipped ) {
                         compileResult.emitOutput.forEach(( emit ) => {
                             if ( !emit.emitSkipped ) {
-                                var vinylFile: File;
                                 if ( emit.codeFile ) {
                                     vinylFile = new File({ path: emit.codeFile.fileName, contents: new Buffer( emit.codeFile.data )})
 
@@ -171,17 +176,17 @@ export class ProjectBuilder implements IBundleBuilder {
         if ( projectCompileResult.diagnostics.length > 0 ) {
             DiagnosticsReporter.reportDiagnostics( projectCompileResult.diagnostics );
 
-            return buildCompleted( new BuildResult( projectCompileResult.diagnostics ) );
+            return buildCompleted( new ProjectBuildResult( projectCompileResult.diagnostics ) );
         }
 
         var allDiagnostics: ts.Diagnostic[] = [];
         var bundleCompileResults: ts2js.CompilerResult[] = [];
-        var bundlingResults: BundleResult[] = [];
+        var bundleBuildResults: Bundler.BundleBuildResult[] = [];
 
         this.totalBundleTime = new Date().getTime();
 
         // Create a bundle builder to build bundles..
-        var bundleBuilder = new BundleBuilder( compiler.getHost(), compiler.getProgram(), this.config.bundlerOptions );
+        var bundleBuilder = new Bundler.BundleBuilder( compiler.getHost(), compiler.getProgram(), this.config.bundlerOptions );
 
         if ( this.config.bundlerOptions.verbose && ( bundles.length == 0 ) ) {
             Logger.log( chalk.yellow( "No bundles found to build." ) );
@@ -194,7 +199,7 @@ export class ProjectBuilder implements IBundleBuilder {
 
             var bundleResult = bundleBuilder.build( bundles[i] );
 
-            bundlingResults.push( bundleResult );
+            bundleBuildResults.push( bundleResult );
 
             if ( !bundleResult.succeeded() ) {
                 DiagnosticsReporter.reportDiagnostics( bundleResult.getErrors() );
@@ -228,7 +233,7 @@ export class ProjectBuilder implements IBundleBuilder {
             this.reportStatistics();
         }
 
-        return buildCompleted( new BuildResult( allDiagnostics, bundleCompileResults ) );
+        return buildCompleted( new ProjectBuildResult( allDiagnostics, bundleBuildResults, bundleCompileResults ) );
     }
 
     private reportBuildStatus( buildResult: BuildResult ) {

@@ -1,6 +1,4 @@
 ﻿import { Logger } from "./Logger";
-
-import * as ts from "typescript";
 import * as chalk from "chalk";
 
 export class StatisticsReporter {

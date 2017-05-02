@@ -1,16 +1,10 @@
-﻿//import { DiagnosticsReporter } from "../Reporting/DiagnosticsReporter";
-//import { BuildResult } from "./BuildResult";
-//import { BundleBuilder } from "../Bundler/BundleBuilder";
-import { BundlerOptions } from "../Bundler/BundlerOptions";
-//import { BundleFile, BundleResult } from "../Bundler/BundleResult";
-import { ProjectConfig } from "./ProjectConfig";
-//import { StatisticsReporter } from "../Reporting/StatisticsReporter";
+﻿import { ProjectConfig } from "./ProjectConfig";
 import { Logger } from "../Reporting/Logger";
-import { BundleParser, Bundle } from "../Bundler/BundleParser";
 import { Glob } from "../Utils/Glob";
 import { TsCore } from "../Utils/TsCore";
 import { Utils } from "../Utils/Utilities";
 
+import * as Bundler from "../Bundler/BundlerModule";
 import * as ts from "typescript";
 import * as _ from "lodash";
 import * as fs from "fs";
@@ -21,11 +15,11 @@ export class Project {
 
     private configFileName: string;
     private configFilePath: string;
-    private bundlerOptions: BundlerOptions;
+    private bundlerOptions: Bundler.BundlerOptions;
 
     private config: ProjectConfig;
 
-    constructor( configFilePath: string, bundlerOptions?: BundlerOptions  ) {
+    constructor( configFilePath: string, bundlerOptions?: Bundler.BundlerOptions  ) {
         this.configFilePath = configFilePath;
         this.bundlerOptions = bundlerOptions || {};
 
@@ -80,7 +74,7 @@ export class Project {
         configParseResult.fileNames = this.expandFileNames( configParseResult.fileNames, configFileDir );
 
         // Parse "bundle" project configuration objects: compilerOptions, files.
-        var bundleParser = new BundleParser();
+        var bundleParser = new Bundler.BundleParser();
         var bundlesParseResult = bundleParser.parseConfigFile( configObject, configFileDir );
 
         if ( bundlesParseResult.errors.length > 0 ) {

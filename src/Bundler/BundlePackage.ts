@@ -1,19 +1,15 @@
-﻿export const enum BundlePackageType {
-    None = 0,
-    Library = 1,
-    Component = 2
-}
+﻿import { PackageType } from "./PackageType";
 
 export class BundlePackage {
-    private packageType: BundlePackageType;
+    private packageType: PackageType;
     private packageNamespace: string = undefined;
     
-    constructor( packageType: BundlePackageType, packageNamespace: string ) {
+    constructor( packageType: PackageType, packageNamespace: string ) {
         this.packageType = packageType;
         this.packageNamespace = packageNamespace;
     }
 
-    public getPackageType(): BundlePackageType {
+    public getPackageType(): PackageType {
         return this.packageType;
     }
 

@@ -1,13 +1,23 @@
 ﻿import * as ts from "typescript";
 import * as ts2js from "ts2js";
+import * as Bundler from "../Bundler/BundlerModule";
 
-export class BuildResult {
+export interface BuildResult {
     errors: ts.Diagnostic[];
-    bundleOutput?: ts2js.CompilerResult[];
+    bundleBuilderResults?: Bundler.BundleBuildResult[];
+    bundleCompilerResults?: ts2js.CompilerResult[];
+    succeeded(): boolean;
+};
 
-    constructor( errors: ts.Diagnostic[], bundles?: ts2js.CompilerResult[] ) {
+export class ProjectBuildResult implements BuildResult {
+    errors: ts.Diagnostic[];
+    bundleBuilderResults?: Bundler.BundleBuildResult[];    
+    bundleCompilerResults?: ts2js.CompilerResult[];
+
+    constructor( errors: ts.Diagnostic[], bundleBuilderResults?: Bundler.BundleBuildResult[], bundles?: ts2js.CompilerResult[] ) {
         this.errors = errors;
-        this.bundleOutput = bundles;
+        this.bundleBuilderResults = bundleBuilderResults;
+        this.bundleCompilerResults = bundles;
     }
 
     public succeeded(): boolean {
