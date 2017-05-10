@@ -1,0 +1,9 @@
+{
+  "name": "ts-bundler",
+  "version": "0.0.0",
+  "description": "TsBundler",
+  "main": "app.js",
+  "author": {
+    "name": "Administrator"
+  }
+}
