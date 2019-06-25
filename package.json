@@ -1,9 +1,51 @@
 {
-  "name": "ts-bundler",
-  "version": "0.0.0",
-  "description": "TsBundler",
-  "main": "app.js",
-  "author": {
-    "name": "Administrator"
+  "name": "tsbundler",
+  "version": "3.0.0-beta.1",
+  "author": "Todd Thomson <todd.thomson@me.com>",
+  "description": "Typescript single module bundle builder.",
+  "license": "MIT",
+  "main": "./lib/tsbundler.js",
+  "typings": "./lib/tsbundler.d.ts",
+  "dependencies": {
+    "@types/chalk": "^2.2.0",
+    "@types/glob": "^7.1.1",
+    "@types/gulp-util": "^3.0.34",
+    "@types/lodash": "^4.14.134",
+    "@types/node": "^10.14.9",
+    "@types/vinyl": "^2.0.3",
+    "chalk": "^2.4.2",
+    "glob": "^7.1.4",
+    "gulp-util": "^3.0.8",
+    "lodash": "^4.17.11",
+    "readable-stream": "^3.4.0",
+    "ts2js": "^3.0.0-beta.4",
+    "vinyl": "^2.2.0"
+  },
+  "devDependencies": {
+    "del": "^4.1.1",
+    "gulp": "^4.0.2",
+    "gulp-hub": "^4.2.0",
+    "tsproject": "~2.1.2",
+    "typescript": "^3.5.2",
+    "vinyl-paths": "^3.0.0"
+  },
+  "keywords": [
+    "bundle",
+    "bundles",
+    "bundling",
+    "minify",
+    "minifier",
+    "typescript",
+    "bundle builder",
+    "typescript bundle"
+  ],
+  "homepage": "https://github.com/toddthomson/tsbundler",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/toddthomson/tsbundler.git"
+  },
+  "bugs": "https://github.com/toddthomson/tsbundler/issues",
+  "scripts": {
+    "build": "gulp build"
   }
 }

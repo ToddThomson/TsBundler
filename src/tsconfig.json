@@ -1,0 +1,61 @@
+{
+  "compileOnSave": true,
+  "compilerOptions": {
+    "target": "es5",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "diagnostics": true,
+    "declaration": true,
+    "sourceMap": true,
+    "listFiles": false,
+    "listEmittedFiles": true,
+    "skipLibCheck": true,
+    "noEmitOnError": false,
+    "noImplicitAny": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "preserveConstEnums": true,
+    "removeComments": false,
+    "noEmit": false
+  },
+  "files": [
+    "./Ast/Ast.ts",
+
+    "./Bundler/BundlerModule.ts",
+    "./Bundler/Bundle.ts",
+    "./Bundler/BundleBuilder.ts",
+    "./Bundler/BundleConfig.ts",
+    "./Bundler/BundlePackage.ts",
+    "./Bundler/BundleParser.ts",
+    "./Bundler/BundleBuildResult.ts",
+    "./Bundler/BundlerOptions.ts",
+    "./Bundler/DependencyBuilder.ts",
+    "./Bundler/ModuleDescriptor.ts",
+    "./Bundler/ModuleContainer.ts",
+    "./Bundler/PackageType.ts",
+    "./Bundler/BundlerTransform.ts",
+
+    "./Reporting/DiagnosticsReporter.ts",
+    "./Reporting/Logger.ts",
+    "./Reporting/StatisticsReporter.ts",
+
+    "./Utils/Debug.ts",
+    "./Utils/Formatter.ts",
+    "./Utils/Glob.ts",
+    "./Utils/TsCore.ts",
+    "./Utils/Utilities.ts",
+
+    "./TsBundler.ts"
+  ],
+  "bundles": {
+    "tsbundler": {
+      "files": [ "./TsBundler.ts" ],
+      "config": {
+        "package": "component",
+        "packageNamespace": "TsBundler",
+        "outDir": "./bundle",
+        "minify": false
+      }
+    }
+  }
+}
