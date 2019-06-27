@@ -1,9 +1,7 @@
 ﻿import * as ts from "typescript"
 import * as path from "path"
-import { StatisticsReporter } from "../Reporting/StatisticsReporter"
-import { Logger } from "../Reporting/Logger"
 import { Bundle } from "./Bundle"
-import { BundleParser } from "./BundleParser"
+import { ConfigParser } from "./ConfigParser"
 import { BundlePackage } from "./BundlePackage"
 import { PackageType } from "./PackageType"
 import { BundlerOptions } from "./BundlerOptions"
@@ -11,9 +9,11 @@ import { BundleBuildResult } from "./BundleBuildResult"
 import { DependencyBuilder } from "./DependencyBuilder"
 import { ModuleDescriptor } from "./ModuleDescriptor"
 import { BundleContainer } from "./ModuleContainer"
-import { Utils } from "../Utils/Utilities"
-import { TsCore } from "../Utils/TsCore"
-import { Ast } from "../Ast/Ast"
+import { Utils } from "@TsToolsCommon/Utils/Utilities"
+import { TsCore } from "@TsToolsCommon/Utils/TsCore"
+import { Ast } from "@TsToolsCommon/Ast/Ast";
+import { StatisticsReporter } from "@TsToolsCommon/Reporting/StatisticsReporter"
+import { Logger } from "@TsToolsCommon/Reporting/Logger"
 
 export class BundleBuilder {
     private bundle: Bundle;

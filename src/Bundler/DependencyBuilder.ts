@@ -1,8 +1,8 @@
 ﻿import * as ts from "typescript"
-import { Ast } from "../Ast/Ast"
-import { Logger } from "../Reporting/Logger"
-import { Utils } from "../Utils/Utilities"
-import { TsCore } from "../Utils/TsCore"
+import { Ast } from "@TsToolsCommon/Ast/Ast"
+import { Logger } from "@TsToolsCommon/Reporting/Logger"
+import { Utils } from "@TsToolsCommon/Utils/Utilities"
+import { TsCore } from "@TsToolsCommon/Utils/TsCore"
 import { ModuleDescriptor } from "./ModuleDescriptor"
 import { BundleContainer } from "./ModuleContainer"
 
@@ -150,7 +150,7 @@ export class DependencyBuilder {
                     const moduleDeclaration: ts.ModuleDeclaration = <ts.ModuleDeclaration>node;
                     
                     if ( ( moduleDeclaration.name.kind === ts.SyntaxKind.StringLiteral ) && 
-                         ( Ast.getModifierFlags( moduleDeclaration ) & ts.ModifierFlags.Ambient || sourceFile.isDeclarationFile ) ) {
+                         ( Ast.getModifierFlagsNoCache( moduleDeclaration ) & ts.ModifierFlags.Ambient || sourceFile.isDeclarationFile ) ) {
                         // An AmbientExternalModuleDeclaration declares an external module.
                         Logger.info( "Scanning for dependencies within ambient module declaration: ", moduleDeclaration.name.text );
                         

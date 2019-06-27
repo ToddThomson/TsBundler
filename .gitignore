@@ -5,8 +5,11 @@ node_modules/*
 obj
 dist/*
 built/*
+src/**/*.js
+src/**/*.js.map
+src/**/*.d.ts
+TsToolsCommon/*
 tests/*
-tsproject.js
 *.dat
 *.njsproj.user
 *.njsproj.vspscc

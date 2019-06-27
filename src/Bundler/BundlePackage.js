@@ -1,17 +1,18 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-class BundlePackage {
-    constructor(packageType, packageNamespace) {
+var BundlePackage = /** @class */ (function () {
+    function BundlePackage(packageType, packageNamespace) {
         this.packageNamespace = undefined;
         this.packageType = packageType;
         this.packageNamespace = packageNamespace;
     }
-    getPackageType() {
+    BundlePackage.prototype.getPackageType = function () {
         return this.packageType;
-    }
-    getPackageNamespace() {
+    };
+    BundlePackage.prototype.getPackageNamespace = function () {
         return this.packageNamespace;
-    }
-}
+    };
+    return BundlePackage;
+}());
 exports.BundlePackage = BundlePackage;
 //# sourceMappingURL=BundlePackage.js.map

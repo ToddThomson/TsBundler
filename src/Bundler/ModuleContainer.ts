@@ -1,7 +1,7 @@
 ﻿import * as ts from "typescript";
 import { ModuleDescriptor } from "./ModuleDescriptor"
-import { Utils } from "../Utils/Utilities"
-import { Logger } from "../Reporting/Logger"
+import { Utils } from "@TsToolsCommon/Utils/Utilities"
+import { Logger } from "@TsToolsCommon/Reporting/Logger"
 
 class IdGenerator {
     static nextId = 1;

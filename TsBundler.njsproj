@@ -56,10 +56,7 @@
     <Folder Include="lib\" />
     <Folder Include="tests\" />
     <Folder Include="src\" />
-    <Folder Include="src\Ast\" />
     <Folder Include="src\Bundler\" />
-    <Folder Include="src\Reporting\" />
-    <Folder Include="src\Utils\" />
   </ItemGroup>
   <ItemGroup>
     <TypeScriptCompile Include="lib\TsBundler.d.ts" />
@@ -67,29 +64,19 @@
       <SubType>Code</SubType>
     </TypeScriptCompile>
     <TypeScriptCompile Include="tests\run.ts" />
-    <TypeScriptCompile Include="src\Ast\Ast.ts" />
     <TypeScriptCompile Include="src\Bundler\Bundle.ts" />
     <TypeScriptCompile Include="src\Bundler\BundleBuilder.ts" />
     <TypeScriptCompile Include="src\Bundler\BundleBuildResult.ts" />
     <TypeScriptCompile Include="src\Bundler\BundleConfig.ts" />
     <TypeScriptCompile Include="src\Bundler\BundlePackage.ts" />
-    <TypeScriptCompile Include="src\Bundler\BundleParser.ts" />
+    <TypeScriptCompile Include="src\Bundler\ConfigParser.ts" />
     <TypeScriptCompile Include="src\Bundler\BundlerModule.ts" />
     <TypeScriptCompile Include="src\Bundler\BundlerOptions.ts" />
     <TypeScriptCompile Include="src\Bundler\DependencyBuilder.ts" />
     <TypeScriptCompile Include="src\Bundler\ModuleContainer.ts" />
     <TypeScriptCompile Include="src\Bundler\ModuleDescriptor.ts" />
     <TypeScriptCompile Include="src\Bundler\PackageType.ts" />
-    <TypeScriptCompile Include="src\Reporting\DiagnosticsReporter.ts" />
-    <TypeScriptCompile Include="src\Reporting\Logger.ts" />
-    <TypeScriptCompile Include="src\Reporting\StatisticsReporter.ts" />
     <TypeScriptCompile Include="src\Bundler\BundlerTransform.ts" />
-    <TypeScriptCompile Include="src\Utils\Debug.ts" />
-    <TypeScriptCompile Include="src\Utils\Formatter.ts" />
-    <TypeScriptCompile Include="src\Utils\Glob.ts" />
-    <TypeScriptCompile Include="src\Utils\TsCore.ts" />
-    <TypeScriptCompile Include="src\Utils\TsVinylFile.ts" />
-    <TypeScriptCompile Include="src\Utils\Utilities.ts" />
   </ItemGroup>
   <Import Project="$(VSToolsPath)\Node.js Tools\Microsoft.NodejsToolsV2.targets" />
   <ProjectExtensions>

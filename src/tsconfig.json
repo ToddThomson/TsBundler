@@ -8,7 +8,6 @@
     "declaration": true,
     "sourceMap": true,
     "listFiles": false,
-    "listEmittedFiles": true,
     "skipLibCheck": true,
     "noEmitOnError": false,
     "noImplicitAny": true,
@@ -16,37 +15,21 @@
     "allowUnusedLabels": false,
     "preserveConstEnums": true,
     "removeComments": false,
-    "noEmit": false
+    "noEmit": false,
+    "baseUrl": ".",
+    "paths": {
+      "@TsToolsCommon/*": [ "../../TsToolsCommon/src/*" ]
+    }
   },
-  "files": [
-    "./Ast/Ast.ts",
 
-    "./Bundler/BundlerModule.ts",
-    "./Bundler/Bundle.ts",
-    "./Bundler/BundleBuilder.ts",
-    "./Bundler/BundleConfig.ts",
-    "./Bundler/BundlePackage.ts",
-    "./Bundler/BundleParser.ts",
-    "./Bundler/BundleBuildResult.ts",
-    "./Bundler/BundlerOptions.ts",
-    "./Bundler/DependencyBuilder.ts",
-    "./Bundler/ModuleDescriptor.ts",
-    "./Bundler/ModuleContainer.ts",
-    "./Bundler/PackageType.ts",
-    "./Bundler/BundlerTransform.ts",
-
-    "./Reporting/DiagnosticsReporter.ts",
-    "./Reporting/Logger.ts",
-    "./Reporting/StatisticsReporter.ts",
-
-    "./Utils/Debug.ts",
-    "./Utils/Formatter.ts",
-    "./Utils/Glob.ts",
-    "./Utils/TsCore.ts",
-    "./Utils/Utilities.ts",
-
-    "./TsBundler.ts"
+  "include": [
+    "./**/*.ts"
   ],
+
+  "exclude": [
+    "node_modules"
+  ],
+
   "bundles": {
     "tsbundler": {
       "files": [ "./TsBundler.ts" ],

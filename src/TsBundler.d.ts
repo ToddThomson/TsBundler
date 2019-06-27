@@ -1,4 +1,15 @@
 import * as ts from "typescript";
-import { BundlerOptions } from "./Bundler/BundlerOptions";
+import { BundlerOptions } from "Bundler/BundlerOptions";
+import { ConfigParser, ConfigResult } from "Bundler/ConfigParser";
+import { PackageType } from "Bundler/PackageType";
+import { BundlePackage } from "Bundler/BundlePackage";
+import { BundleConfig } from "Bundler/BundleConfig";
+import { Bundle } from "Bundler/Bundle";
+export { PackageType };
+export { BundlePackage };
+export { BundleConfig };
+export { Bundle };
 export { BundlerOptions };
+export { ConfigResult };
+export { ConfigParser };
 export declare function getBundlerTransform(host: ts.CompilerHost, program: ts.Program, options: BundlerOptions): ts.TransformerFactory<ts.SourceFile>;

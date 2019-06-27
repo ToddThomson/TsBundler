@@ -1,11 +1,15 @@
 {
   "name": "tsbundler",
-  "version": "3.0.0-beta.1",
+  "version": "3.0.0-beta.2",
   "author": "Todd Thomson <todd.thomson@me.com>",
   "description": "Typescript single module bundle builder.",
   "license": "MIT",
   "main": "./lib/tsbundler.js",
+  "types": "./lib/tsbundler.d.ts",
   "typings": "./lib/tsbundler.d.ts",
+  "engines": {
+    "node": ">= 8"
+  },
   "dependencies": {
     "@types/chalk": "^2.2.0",
     "@types/glob": "^7.1.1",
@@ -18,7 +22,7 @@
     "gulp-util": "^3.0.8",
     "lodash": "^4.17.11",
     "readable-stream": "^3.4.0",
-    "ts2js": "^3.0.0-beta.4",
+    "ts2js": "^3.0.0-beta.5",
     "vinyl": "^2.2.0"
   },
   "devDependencies": {
@@ -46,6 +50,9 @@
   },
   "bugs": "https://github.com/toddthomson/tsbundler/issues",
   "scripts": {
-    "build": "gulp build"
+    "tsc-build": "tsc --build ./src ",
+    "tsc-clean": "tsc --build ./src --clean",
+    "build": "tsc --build ./src && gulp build",
+    "clean": "tsc --build ./src --clean && gulp clean"
   }
 }

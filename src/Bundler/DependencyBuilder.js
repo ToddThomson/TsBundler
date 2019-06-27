@@ -1,10 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var ts = require("typescript");
-var Ast_1 = require("../Ast/Ast");
-var Logger_1 = require("../Reporting/Logger");
-var Utilities_1 = require("../Utils/Utilities");
-var TsCore_1 = require("../Utils/TsCore");
+var Ast_1 = require("@TsToolsCommon/Ast/Ast");
+var Logger_1 = require("@TsToolsCommon/Reporting/Logger");
+var Utilities_1 = require("@TsToolsCommon/Utils/Utilities");
+var TsCore_1 = require("@TsToolsCommon/Utils/TsCore");
 var ModuleDescriptor_1 = require("./ModuleDescriptor");
 var ModuleContainer_1 = require("./ModuleContainer");
 var DependencyBuilder = /** @class */ (function () {
@@ -117,7 +117,7 @@ var DependencyBuilder = /** @class */ (function () {
                     // NOTES: We will only support ES6 import/export module syntax
                     var moduleDeclaration = node;
                     if ((moduleDeclaration.name.kind === ts.SyntaxKind.StringLiteral) &&
-                        (Ast_1.Ast.getModifierFlags(moduleDeclaration) & ts.ModifierFlags.Ambient || sourceFile.isDeclarationFile)) {
+                        (Ast_1.Ast.getModifierFlagsNoCache(moduleDeclaration) & ts.ModifierFlags.Ambient || sourceFile.isDeclarationFile)) {
                         // An AmbientExternalModuleDeclaration declares an external module.
                         Logger_1.Logger.info("Scanning for dependencies within ambient module declaration: ", moduleDeclaration.name.text);
                         getNodeDependencies(moduleDeclaration.body);

@@ -1,22 +1,20 @@
-﻿import { Bundle } from "./Bundle";
+﻿import * as ts from "typescript";
+import * as path from "path";
+import { Bundle } from "./Bundle";
 import { BundlePackage } from "./BundlePackage";
 import { PackageType } from "./PackageType";
+import { Logger } from "@TsToolsCommon/Reporting/Logger";
+import { Utils } from "@TsToolsCommon/Utils/Utilities";
+import { TsCore } from "@TsToolsCommon/Utils/TsCore";
 
-import { Logger } from "../Reporting/Logger";
-import { Utils } from "../Utils/Utilities";
-import { TsCore } from "../Utils/TsCore";
-
-import * as ts from "typescript";
-import * as path from "path";
-
-export interface ParsedBundlesResult {
+export interface ConfigResult {
     bundles: Bundle[];
     errors: ts.Diagnostic[];
 }
 
-export class BundleParser {
+export class ConfigParser {
     
-    public parseConfigFile( json: any, basePath: string ): ParsedBundlesResult {
+    public parseConfigFile( json: any, basePath: string ): ConfigResult {
         var errors: ts.Diagnostic[] = [];
 
         return {
@@ -32,7 +30,6 @@ export class BundleParser {
                 Logger.info( jsonBundles );
 
                 for ( var id in jsonBundles ) {
-                    Logger.info( "Bundle Id: ", id, jsonBundles[id] );
                     var jsonBundle: any = jsonBundles[id];
                     var bundleName: string;
                     var fileNames: string[] = [];
@@ -45,7 +42,6 @@ export class BundleParser {
                     if ( Utils.hasProperty( jsonBundle, "files" ) ) {
                         if ( jsonBundle["files"] instanceof Array ) {
                             fileNames = Utils.map( <string[]>jsonBundle["files"], s => path.join( basePath, s ) );
-                            Logger.info( "bundle files: ", fileNames );
                         }
                         else {
                             errors.push( TsCore.createDiagnostic( { code: 6063, category: ts.DiagnosticCategory.Error, key: "Bundle_0_files_is_not_an_array_6063", message: "Bundle '{0}' files is not an array." }, id ) );

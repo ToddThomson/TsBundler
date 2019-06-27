@@ -1,6 +1,6 @@
-﻿import { BundleContainer } from "./ModuleContainer"
-import { Utils } from "../Utils/Utilities";
-import * as ts from "typescript";
+﻿import * as ts from "typescript"
+import { BundleContainer } from "./ModuleContainer"
+import { Utils } from "@TsToolsCommon/Utils/Utilities";
 
 export class ModuleDescriptor {
     private node: ts.Node;

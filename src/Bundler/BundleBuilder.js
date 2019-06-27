@@ -2,14 +2,14 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 var ts = require("typescript");
 var path = require("path");
-var StatisticsReporter_1 = require("../Reporting/StatisticsReporter");
-var Logger_1 = require("../Reporting/Logger");
 var PackageType_1 = require("./PackageType");
 var BundleBuildResult_1 = require("./BundleBuildResult");
 var DependencyBuilder_1 = require("./DependencyBuilder");
-var Utilities_1 = require("../Utils/Utilities");
-var TsCore_1 = require("../Utils/TsCore");
-var Ast_1 = require("../Ast/Ast");
+var Utilities_1 = require("@TsToolsCommon/Utils/Utilities");
+var TsCore_1 = require("@TsToolsCommon/Utils/TsCore");
+var Ast_1 = require("@TsToolsCommon/Ast/Ast");
+var StatisticsReporter_1 = require("@TsToolsCommon/Reporting/StatisticsReporter");
+var Logger_1 = require("@TsToolsCommon/Reporting/Logger");
 var BundleBuilder = /** @class */ (function () {
     function BundleBuilder(host, program, bundlerOptions) {
         this.dependencyTime = 0;

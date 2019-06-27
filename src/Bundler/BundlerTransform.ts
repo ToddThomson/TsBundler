@@ -2,19 +2,6 @@
 import { BundleBuilder } from "../Bundler/BundleBuilder";
 import { BundlerOptions } from "../Bundler/BundlerOptions";
 
-function bundleBuilderTransform( host: ts.CompilerHost, program: ts.Program, context: ts.TransformationContext ): ts.Transformer<ts.SourceFile> {
-    return transform;
-
-    /**
-     * Bundle the provided SourceFile.
-     *
-     * @param node A SourceFile node.
-     */
-    function transform( node: ts.SourceFile ) : ts.SourceFile {
-        return node;
-    }
-}
-
 export class BundlerTransform{
     private bundlerOptions: BundlerOptions;
     private compilerOptions: ts.CompilerOptions;
@@ -34,6 +21,7 @@ export class BundlerTransform{
         this.bundler = new BundleBuilder( this.host, this.program, this.bundlerOptions );
 
         function transformImpl( sourceFile: ts.SourceFile ) {
+            // TODO: Transform sourceFile...
             return sourceFile;
         }
 
