@@ -1,5 +1,13 @@
-﻿export class Greeter {
+﻿import * as ts from "typescript"
+import { Hello } from "./hello"
+
+export class Greeter {
     public SayHello() {
-        return "Hello from the Greeter class";
+        const hello = new Hello();
+        return hello.sayHi() + " from the Greeter class " + this.typescriptVersion;
+    }
+
+    private typescriptVersion(): string {
+        return ts.versionMajorMinor;
     }
 }

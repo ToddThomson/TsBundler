@@ -1,45 +1,46 @@
 ﻿import * as ts from "typescript"
-import { Ast } from "@TsToolsCommon/Ast/Ast"
-import { Logger } from "@TsToolsCommon/Reporting/Logger"
-import { Utils } from "@TsToolsCommon/Utils/Utilities"
-import { TsCore } from "@TsToolsCommon/Utils/TsCore"
+import { Ast } from "../../../TsToolsCommon/src/Typescript/AstHelpers"
+import { Logger } from "../../../TsToolsCommon/src/Reporting/Logger"
+import { Utils } from "../../../TsToolsCommon/src/Utils/Utilities"
 import { ModuleDescriptor } from "./ModuleDescriptor"
-import { BundleContainer } from "./ModuleContainer"
+import { BundleContainer } from "./BundleContainer"
 
-export class DependencyBuilder {
-    private host: ts.CompilerHost;
-    private program: ts.Program;
-    private options: ts.CompilerOptions;
+export class DependencyBuilder
+{
+    private typeChecker: ts.TypeChecker;
     private bundleModuleStack: BundleContainer[] = [];
 
     // The global scope, top-level bundle
     private globalBundle: BundleContainer;
 
-    constructor( host: ts.CompilerHost, program: ts.Program ) {
-        this.host = host;
-        this.program = program;
-        this.options = this.program.getCompilerOptions();
+    constructor( program: ts.Program )
+    {
+        this.typeChecker = program.getTypeChecker();
     }
 
     /**
-     * Returns a chained module container. Each container stores an ordered array of dependencies ( import or exports ) found in the given source file. 
-     * @param sourceFile { SourceFile } The input source file used to .
+     * Builds an ordered array of dependencies from import and exports declarations
+     * from source file parameter.
+     * 
+     * @param entrySourceFile { SourceFile } The input source file used to construct the bundle container.
+     * @returns a linked list of module container.
      */
-    public getSourceFileDependencies( sourceFile: ts.SourceFile ): BundleContainer {
-        const canonicalSourceFileName = this.host.getCanonicalFileName( sourceFile.fileName );
+    public getSourceFileDependencies( entrySourceFile: ts.SourceFile ): BundleContainer
+    {
+        const canonicalSourceFileName = entrySourceFile.fileName;
 
-        // Set the initial global ( is this top level ) module container for the input source file.
-        this.globalBundle = new BundleContainer( canonicalSourceFileName, sourceFile,  /* isBundleNamespace */ false /* no parent container */ ); 
+        // Set the global module container for the input source file.
+        this.globalBundle = new BundleContainer( canonicalSourceFileName, entrySourceFile,  /* isBundleNamespace */ false /* no parent container */ );
         this.bundleModuleStack.push( this.globalBundle );
-         
+
         // Walk the module dependency tree
-        this.walkModuleDependencies( sourceFile );
+        this.walkModuleDependencies( entrySourceFile );
 
         return this.globalBundle;
     }
 
-    private walkModuleDependencies( moduleSourceFile: ts.SourceFile ) {
-        var self = this;
+    private walkModuleDependencies( moduleSourceFile: ts.SourceFile )
+    {
         var visitedModulesByContainer: ts.MapLike<boolean>[] = [];
         var visitedModules: ts.MapLike<boolean> = {};
         var moduleDescriptors: ts.MapLike<ModuleDescriptor> = {};
@@ -47,64 +48,77 @@ export class DependencyBuilder {
         /**
          * Recursive function used to generate module descriptors for dependencies.
          */
-        function visitDependencies( moduleSource: ts.SourceFile, dependencyNodes: ts.Node[] ) {
-            
-            var isNextContainer = self.isNextContainer( moduleSource );
+        const visitDependencies = ( moduleSourceFile: ts.SourceFile, dependencyNodes: ts.Node[] ) =>
+        {
+            Logger.trace( "visiting dependencies for source file: ", moduleSourceFile.fileName );
 
-            if ( isNextContainer ) {
+            // Look for our @bundlemodule annotation which is the start of an
+            // internal bundle container.
+            var isNextContainer = this.isNextContainer( moduleSourceFile );
+
+            if ( isNextContainer )
+            {
                 visitedModulesByContainer.push( visitedModules );
                 visitedModules = {};
             }
 
             // Loop through each dependency node and create a module descriptor for each
-            dependencyNodes.forEach( dependencyNode => {
-                let dependencySymbol = self.getSymbolFromNode( dependencyNode );
-                let dependencySourceFile = self.getSourceFileFromSymbol( dependencySymbol );
+            dependencyNodes.forEach( dependencyNode =>
+            {
                 let moduleDescriptor: ModuleDescriptor;
 
-                // TJT: We should look for aliases: import * as alias from moduleSpecifier. Set up a test for this.
+                let dependencySourceFile = Ast.getSourceFileFromAnyImportExportNode( dependencyNode, this.typeChecker );
+                let dependencyFileName = dependencySourceFile.fileName;
 
-                if ( !Utils.hasProperty( moduleDescriptors, dependencySymbol.name ) ) {
-                    Logger.trace( "New module descriptor for: ", dependencySymbol.name );
-                    let dependencyNodes: ts.Node[] = [];
+                if ( !Utils.hasProperty( moduleDescriptors, dependencyFileName ) )
+                {
+                    Logger.trace( "Creating new module descriptor for: ", dependencyFileName );
+
+                    let moduleDependencyNodes: ts.Node[] = [];
                     let isBundleModule = false;
 
-                    if ( !dependencySourceFile.isDeclarationFile ) {
-                        dependencyNodes = self.getModuleDependencyNodes( dependencySourceFile );
+                    if ( !dependencySourceFile.isDeclarationFile )
+                    {
+                        moduleDependencyNodes = this.getModuleDependencyNodes( dependencySourceFile );
 
                         // Look for our @bundlemodule annotation specifying an "internal" bundle module.
-                        isBundleModule = self.hasModuleAnnotation( dependencySourceFile );
+                        isBundleModule = this.hasModuleAnnotation( dependencySourceFile );
                     }
-                    
-                    // TJT: Not all args needed. Review before release.
-                    moduleDescriptor = new ModuleDescriptor( dependencyNode, dependencyNodes, dependencySourceFile, dependencySymbol, isBundleModule, self.currentContainer() );
-                    moduleDescriptors[ dependencySymbol.name ] = moduleDescriptor;
+
+                    moduleDescriptor = new ModuleDescriptor( dependencyNode, moduleDependencyNodes, dependencySourceFile, isBundleModule, this.currentContainer() );
+                    moduleDescriptors[dependencyFileName] = moduleDescriptor;
                 }
-                else {
-                    moduleDescriptor = moduleDescriptors[ dependencySymbol.name ];
+                else
+                {
+                    moduleDescriptor = moduleDescriptors[dependencyFileName];
                 }
 
                 // We don't need to walk dependencies within declaration files
-                if ( !dependencySourceFile.isDeclarationFile ) {
-                    if ( !Utils.hasProperty( visitedModules, dependencySymbol.name ) ) {
-                        visitedModules[ dependencySymbol.name ] = true;
+                if ( !dependencySourceFile.isDeclarationFile )
+                {
+                    if ( !Utils.hasProperty( visitedModules, dependencyFileName ) )
+                    {
+                        visitedModules[dependencyFileName] = true;
                         visitDependencies( dependencySourceFile, moduleDescriptor.getDependencies() );
                     }
                 }
 
                 // Update current module container ordered dependencies...                
-                if ( dependencySourceFile.isDeclarationFile ) {
+                if ( dependencySourceFile.isDeclarationFile )
+                {
                     // All top-level dependency module descriptors are added to the global scoped, top-level bundle container
-                    self.globalBundle.addModule( moduleDescriptor, dependencySymbol.name );
+                    this.globalBundle.addModule( moduleDescriptor );//, dependencySymbol.name );
                 }
-                else {
+                else
+                {
                     // Add the module to the current bundle module container.
-                    self.currentContainer().addModule( moduleDescriptor, dependencySymbol.name );
+                    this.currentContainer().addModule( moduleDescriptor );//, dependencySymbol.name );
                 }
-            });
+            } );
 
-            if ( isNextContainer ) {
-                self.restoreContainer();
+            if ( isNextContainer )
+            {
+                this.restoreContainer();
 
                 visitedModules = visitedModulesByContainer.pop();
             }
@@ -114,81 +128,100 @@ export class DependencyBuilder {
         visitDependencies( moduleSourceFile, this.getModuleDependencyNodes( moduleSourceFile ) );
     }
 
-    private getModuleDependencyNodes( sourceFile: ts.SourceFile ): ts.Node[] {
+    private getModuleDependencyNodes( sourceFile: ts.SourceFile ): ts.Node[]
+    {
         // We are only interested in source code files ( not declaration files )
-        if ( !Ast.isSourceCodeFile( sourceFile ) ) {
+        if ( !Ast.isSourceCodeFile( sourceFile ) )
+        {
             return [];
         }
 
+        Logger.trace( "Getting dependency nodes for source file: ", sourceFile.fileName );
+
         var dependencyNodes: ts.Node[] = [];
-        var self = this;
-        
-        // Search the source file module/node for dependencies...
-        function getNodeDependencies( searchNode: ts.Node ) {
-            ts.forEachChild( searchNode, node => {
-                if ( node.kind === ts.SyntaxKind.ImportDeclaration || 
-                     node.kind === ts.SyntaxKind.ImportEqualsDeclaration || 
-                     node.kind === ts.SyntaxKind.ExportDeclaration ) {
-                    
-                    let moduleNameExpr = TsCore.getExternalModuleName( node );
 
-                    if ( moduleNameExpr && moduleNameExpr.kind === ts.SyntaxKind.StringLiteral ) {
-                        let moduleSymbol = self.program.getTypeChecker().getSymbolAtLocation( moduleNameExpr );
+        // Search the source file module/node for import or export dependencies...
+        const getModuleDependencies = ( moduleNode: ts.Node ) =>
+        {
+            ts.forEachChild( moduleNode, node =>
+            {
+                if ( Ast.isAnyImportOrExport( node ) )
+                {
+                    // Get the import/export module name.
+                    let moduleName = Ast.getExternalModuleName( node );
 
-                        if ( moduleSymbol ) {
+                    if ( moduleName && moduleName.kind === ts.SyntaxKind.StringLiteral )
+                    {
+                        // Add dependency node if it references an external module.
+                        let moduleSymbol = this.typeChecker.getSymbolAtLocation( moduleName );
+
+                        if ( moduleSymbol )
+                        {
                             dependencyNodes.push( node );
                         }
                     }
                 }
-                else if ( node.kind === ts.SyntaxKind.ModuleDeclaration ) {
-                    // For a namespace ( or module ), traverse the body to locate ES6 module dependencies.
-                    // TJT: This section needs to be reviewed. Should namespace/module syntax kinds be scanned or
-                    //      Do we only support ES6 import/export syntax, where dependencies must be declared top level?
+                else if ( node.kind === ts.SyntaxKind.ModuleDeclaration )
+                {
+                    // For a namespace ( module declaration ), traverse the body to locate ES6 module dependencies.
+
+                    // TJT: This section needs to be reviewed.
+                    
+                    // Should namespace / module syntax kinds be scanned or
+                    // Do we only support ES6 import/export syntax, where dependencie
+                    // must be declared top level?
                     //
                     // NOTES: We will only support ES6 import/export module syntax
-                    
+
                     const moduleDeclaration: ts.ModuleDeclaration = <ts.ModuleDeclaration>node;
-                    
-                    if ( ( moduleDeclaration.name.kind === ts.SyntaxKind.StringLiteral ) && 
-                         ( Ast.getModifierFlagsNoCache( moduleDeclaration ) & ts.ModifierFlags.Ambient || sourceFile.isDeclarationFile ) ) {
+
+                    if ( ( moduleDeclaration.name.kind === ts.SyntaxKind.StringLiteral ) &&
+                        ( Ast.getModifierFlagsNoCache( moduleDeclaration ) & ts.ModifierFlags.Ambient || sourceFile.isDeclarationFile ) )
+                    {
                         // An AmbientExternalModuleDeclaration declares an external module.
                         Logger.info( "Scanning for dependencies within ambient module declaration: ", moduleDeclaration.name.text );
-                        
-                        getNodeDependencies( moduleDeclaration.body );
+
+                        getModuleDependencies( moduleDeclaration.body );
                     }
                 }
-            });
+            } );
         };
 
-        getNodeDependencies( sourceFile );
+        getModuleDependencies( sourceFile );
 
         return dependencyNodes;
     }
 
-    private hasModuleAnnotation( sourceFile: ts.SourceFile ): boolean {
+    private hasModuleAnnotation( sourceFile: ts.SourceFile ): boolean
+    {
         // Look for our bundlemodule annotation.
         const sourceText = sourceFile.getFullText();
         const commentRanges = ts.getLeadingCommentRanges( sourceText, 0 );
-        
-        return Utils.forEach( commentRanges, commentRange => {
+
+        return Utils.forEach( commentRanges, commentRange =>
+        {
             const comment = sourceText.substring( commentRange.pos, commentRange.end );
 
             return comment.indexOf( "@bundlemodule" ) >= 0;
-        });
+        } );
     }
 
-    private getModuleAnnotationName( sourceFile: ts.SourceFile ): string {
+    private getModuleAnnotationName( sourceFile: ts.SourceFile ): string
+    {
         const bundleModuleNamespaceRegex = /\{(.*?)\}/;
         const sourceText = sourceFile.getFullText();
         const commentRanges = ts.getLeadingCommentRanges( sourceText, 0 );
-        
-        for ( const commentRange of commentRanges ) {
+
+        for ( const commentRange of commentRanges )
+        {
             const comment = sourceText.substring( commentRange.pos, commentRange.end );
 
-            if ( comment.indexOf( "@bundlemodule" ) >= 0 ) {
+            if ( comment.indexOf( "@bundlemodule" ) >= 0 )
+            {
                 const namespaceNameMatch = bundleModuleNamespaceRegex.exec( comment );
-                
-                if ( namespaceNameMatch ) {
+
+                if ( namespaceNameMatch )
+                {
                     return namespaceNameMatch[0].replace( "{", "" ).replace( "}", "" ).trim();
                 }
             }
@@ -197,22 +230,27 @@ export class DependencyBuilder {
         return undefined;
     }
 
-    private currentContainer(): BundleContainer {
-        return this.bundleModuleStack[ this.bundleModuleStack.length - 1 ];
+    private currentContainer(): BundleContainer
+    {
+        return this.bundleModuleStack[this.bundleModuleStack.length - 1];
     }
 
-    private restoreContainer(): BundleContainer {
+    private restoreContainer(): BundleContainer
+    {
         return this.bundleModuleStack.pop();
     }
 
-    private isNextContainer( sourceFile: ts.SourceFile ): boolean {
-        if ( this.hasModuleAnnotation( sourceFile ) ) {
+    private isNextContainer( sourceFile: ts.SourceFile ): boolean
+    {
+        if ( this.hasModuleAnnotation( sourceFile ) )
+        {
             var moduleName = this.getModuleAnnotationName( sourceFile );
 
             // TODO: How to handle missing module name? 
             // 1) Generate an error?
             // 2) Generate a module name from symbol name?
-            if ( !moduleName ) {
+            if ( !moduleName )
+            {
                 moduleName = "missing_module_name";
             }
 
@@ -220,7 +258,7 @@ export class DependencyBuilder {
 
             // Before changing the current container we must first add the new container to the children of the current container.
             let currentModule = this.currentContainer();
-                        
+
             // Add new container context to the exising current container
             currentModule.addChild( nextModule );
 
@@ -230,29 +268,5 @@ export class DependencyBuilder {
         }
 
         return false;
-    }
-
-    private isExternalModuleImportEqualsDeclaration( node: ts.Node ) {
-        return node.kind === ts.SyntaxKind.ImportEqualsDeclaration && ( <ts.ImportEqualsDeclaration>node ).moduleReference.kind === ts.SyntaxKind.ExternalModuleReference;
-    }
-
-    private getExternalModuleImportEqualsDeclarationExpression( node: ts.Node ) {
-        return ( <ts.ExternalModuleReference>( <ts.ImportEqualsDeclaration>node ).moduleReference ).expression;
-    }
-
-    private getSymbolFromNode( node: ts.Node ): ts.Symbol {
-        let moduleNameExpr = TsCore.getExternalModuleName( node );
-
-        if ( moduleNameExpr && moduleNameExpr.kind === ts.SyntaxKind.StringLiteral ) {
-            return this.program.getTypeChecker().getSymbolAtLocation( moduleNameExpr );
-        }
-
-        return undefined;
-    }
-
-    private getSourceFileFromSymbol( importSymbol: ts.Symbol ): ts.SourceFile {
-        let declaration = importSymbol.getDeclarations()[0];
-
-        return declaration.getSourceFile();
     }
 }

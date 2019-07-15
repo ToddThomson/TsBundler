@@ -1,25 +1,25 @@
 ﻿import * as ts from "typescript"
-import { BundleContainer } from "./ModuleContainer"
-import { Utils } from "@TsToolsCommon/Utils/Utilities";
+import { BundleContainer } from "./BundleContainer"
 
+/**
+ * An external module descriptor. 
+ */
 export class ModuleDescriptor {
     private node: ts.Node;
     private sourceFile: ts.SourceFile;
-    private symbol: ts.Symbol;
 
     private isBundleModule: boolean;
 
-    // Map of container ids that this module has been referenced in
+    // Map of container ids that this module has been referenced in.
     private containers: ts.MapLike<BundleContainer> = {};
 
-    // TJT: Why isn't this an array of ModuleModuleDescriptors? Array of external dependencies
+    // TJT: Why isn't this an array of ModuleDescriptors? Array of external dependencies
     private dependencies: ts.Node[] = [];
 
-    constructor( node: ts.Node, dependencies: ts.Node[], sourceFile: ts.SourceFile, symbol: ts.Symbol, isBundleModule: boolean, container: BundleContainer ) {
+    constructor( node: ts.Node, dependencies: ts.Node[], sourceFile: ts.SourceFile, isBundleModule: boolean, container: BundleContainer ) {
         this.node = node;
         this.dependencies = dependencies;
         this.sourceFile = sourceFile;
-        this.symbol = symbol;
         this.isBundleModule = isBundleModule;
 
         // TJT: Add the container that this module has been found in?

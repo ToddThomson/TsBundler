@@ -1,7 +1,6 @@
 ﻿import * as ts from "typescript";
 import { ModuleDescriptor } from "./ModuleDescriptor"
-import { Utils } from "@TsToolsCommon/Utils/Utilities"
-import { Logger } from "@TsToolsCommon/Reporting/Logger"
+import { Utils } from "../../../TsToolsCommon/src/Utils/Utilities"
 
 class IdGenerator {
     static nextId = 1;
@@ -17,46 +16,51 @@ class IdGenerator {
  * the @bundlemodule( moduleName: string ) annotation in an ambient source file.
  */
 export class BundleContainer {
-    private sourceFile: ts.SourceFile;
+    private entrysourceFile: ts.SourceFile;
 
     private parent: BundleContainer = undefined;
     private children: BundleContainer[] = [];
 
     private modules: ModuleDescriptor[] = [];
-    private modulesAdded: ts.MapLike<boolean> = {};
+    private moduleByFileName: ts.MapLike<ModuleDescriptor> = {};
 
     private id: number;
     private name: string;
 
-    private isBundleModule: boolean;
+    private isInternalBundle: boolean;
 
     constructor( name: string, sourceFile: ts.SourceFile, isBundleModule: boolean, parent?: BundleContainer ) {
         this.name = name;
-        this.sourceFile = sourceFile;
-        this.isBundleModule = isBundleModule;
+        this.entrysourceFile = sourceFile;
+        this.isInternalBundle = isBundleModule;
         this.parent = parent;
 
         this.id = IdGenerator.getNextId();
     }
 
-    public addModule( module: ModuleDescriptor, fileName: string ) {
-        if ( !Utils.hasProperty( this.modulesAdded, fileName ) ) {
-            this.modules.push( module );
+    public addModule( module: ModuleDescriptor ) {
+        const fileName = module.getFileName();
 
-            // TJT: This should be module.fileName
-            this.modulesAdded[ fileName ] = true;
+        if ( !Utils.hasProperty( this.moduleByFileName, fileName ) )
+        {
+            this.modules.push( module );
+            this.moduleByFileName[fileName] = module;
         }
     }
 
-    public isBundle(): boolean {
-        return this.isBundleModule;
+    public isInternal(): boolean {
+        return this.isInternalBundle;
+    }
+
+    public getModule( moduleFileName: string ): ModuleDescriptor
+    {
+        return this.moduleByFileName[moduleFileName];
     }
 
     public getModules(): ModuleDescriptor[] {
         return this.modules;
     }
 
-    // API: should be called add()
     public addChild( container: BundleContainer ): void {
         this.children.push( container );
     }
@@ -69,13 +73,12 @@ export class BundleContainer {
         return this.parent;
     }
 
-    // TJT: Why Name and FileName?
     public getName(): string {
         return this.name;
     }
 
     public getFileName(): string {
-        return this.sourceFile.fileName;
+        return this.entrysourceFile.fileName;
     }
 
     public getId(): number {

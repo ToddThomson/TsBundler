@@ -3,18 +3,18 @@ import * as path from "path";
 import { Bundle } from "./Bundle";
 import { BundlePackage } from "./BundlePackage";
 import { PackageType } from "./PackageType";
-import { Logger } from "@TsToolsCommon/Reporting/Logger";
-import { Utils } from "@TsToolsCommon/Utils/Utilities";
-import { TsCore } from "@TsToolsCommon/Utils/TsCore";
+import { Logger } from "../../../TsToolsCommon/src/Reporting/Logger";
+import { Utils } from "../../../TsToolsCommon/src/Utils/Utilities";
+import { TsCore } from "../../../TsToolsCommon/src/Typescript/TsCore";
 
-export interface ConfigResult {
+export interface BundleConfigResult {
     bundles: Bundle[];
     errors: ts.Diagnostic[];
 }
 
-export class ConfigParser {
+export class BundleConfigParser {
     
-    public parseConfigFile( json: any, basePath: string ): ConfigResult {
+    public parseConfigFile( json: any, basePath: string ): BundleConfigResult {
         var errors: ts.Diagnostic[] = [];
 
         return {

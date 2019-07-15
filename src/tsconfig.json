@@ -1,5 +1,6 @@
 {
   "compileOnSave": true,
+
   "compilerOptions": {
     "target": "es5",
     "module": "commonjs",
@@ -15,16 +16,8 @@
     "allowUnusedLabels": false,
     "preserveConstEnums": true,
     "removeComments": false,
-    "noEmit": false,
-    "baseUrl": ".",
-    "paths": {
-      "@TsToolsCommon/*": [ "../../TsToolsCommon/src/*" ]
-    }
+    "noEmit": false
   },
-
-  "include": [
-    "./**/*.ts"
-  ],
 
   "exclude": [
     "node_modules"
