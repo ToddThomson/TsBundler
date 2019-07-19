@@ -1,4 +1,5 @@
 ﻿import * as ts from "typescript"
+import * as path from "path"
 import { Bundle } from "./Bundle"
 import { BundleConfigParser } from "./BundlerConfigParser"
 import { BundlePackage } from "./BundlePackage"
@@ -8,11 +9,12 @@ import { ImportEqualsCollection } from "./ImportEqualsCollection"
 import { BundlerOptions } from "./BundlerOptions"
 import { BundleBuildResult } from "./BundleBuildResult"
 import { DependencyBuilder } from "./DependencyBuilder"
-import { BundleContainer } from "./BundleContainer"
+import { Module } from "./Module"
+import { ModuleContainer } from "./ModuleContainer"
 import { Utils } from "../../../TsToolsCommon/src/Utils/Utilities"
-import { Ast } from "../../../TsToolsCommon/src/Typescript/AstHelpers";
+import { Ast } from "../../../TsToolsCommon/src/Typescript/AstHelpers"
 import { Logger } from "../../../TsToolsCommon/src/Reporting/Logger"
-import { BundleConfig } from "./BundleConfig";
+import { BundleConfig } from "./BundleConfig"
 
 export class BundleBuilder
 {
@@ -32,6 +34,8 @@ export class BundleBuilder
 
     private bundleImports: ImportCollection;
     private bundleImportEquals: ImportEqualsCollection;
+
+    private moduleNamespaces: ts.MapLike<ts.ModuleName> = {};
 
     constructor( program: ts.Program, bundlerOptions: BundlerOptions )
     {
@@ -56,90 +60,209 @@ export class BundleBuilder
     {
         const dependencyBuilder = new DependencyBuilder( this.program );
 
-        // TJT: Poor naming.
         let bundleContainer = dependencyBuilder.getSourceFileDependencies( this.sourceFile );
-
-        Logger.info( "Traversing dependencies for bundle: ", bundleContainer.getFileName() );
-        this.processBundleContainer( bundleContainer );
-
-        for ( var childContainer of bundleContainer.getChildren() )
-        {
-            this.processBundleContainer( childContainer );
-        }
-
-        return this.generateBundleSourceFile();
-
-        //if ( bundle.config.package.getPackageType() === PackageType.Library ) {
-        //    // Wrap the bundle in an exported namespace with the bundle name
-        //    bundleText += "export namespace " + bundle.config.package.getPackageNamespace() + " {\r\n";
-        //    bundleText += this.bundleCodeText;
-        //    bundleText += " \r\n}";
-        //}
-
-        //var bundleExtension = ".ts"; //isBundleTsx ? ".tsx" : ".ts";
-        //var bundleText = ""; // Fixme:
-        //var bundleFile = { path: "bundle" + bundleExtension, extension: bundleExtension, text: bundleText };
-
-        //return new BundleBuildResult( [], bundleFile );
+       
+        return this.generateBundleSourceFile( bundleContainer );
     }
 
-    private processBundleContainer( bundleContainer: BundleContainer )
+    private generateBundleSourceFile( moduleContainer: ModuleContainer ): ts.SourceFile
     {
-        for ( var moduleDescriptor of bundleContainer.getModules() )
+        var bundleSourceFile = ts.createSourceFile(
+            "bundle.ts",
+            "",
+            this.program.getCompilerOptions().target );
+
+        let containerModuleBlock = ts.createModuleBlock( [ts.createEmptyStatement()] );
+
+        // Create a namespace for the module container.
+        let containerNamespace: ts.ModuleDeclaration = this.createNamespaceForModuleContainer( moduleContainer.getUniqueName(), containerModuleBlock );
+        let containerName = containerNamespace.name;
+
+        // Now add the individual module namepaces to the container block...
+        for ( var module of moduleContainer.getModules() )
         {
-            Logger.info( "Processing dependency module: ", moduleDescriptor.getFileName() )
+            const moduleNamespace = this.convertModuleToNamespace( module, containerName );
 
-            var moduleDependencyNode = moduleDescriptor.getNode();
-            var moduleSourceFile = moduleDescriptor.getSourceFile();
+            this.moduleNamespaces[module.getSourceFile().fileName] = moduleNamespace.name;
 
-            if ( !moduleSourceFile.isDeclarationFile )
-            {
-                let moduleDependencies = moduleDescriptor.getDependencies();
-
-                for ( var dependencyNode of moduleDependencies )
-                {
-                    var dependencySourceFile = Ast.getSourceFileFromAnyImportExportNode( dependencyNode, this.typeChecker );
-
-                    if ( dependencySourceFile && !dependencySourceFile.isDeclarationFile )
-                    {
-                        const dependencyFileName = dependencySourceFile.fileName;
-                        
-                        if ( !Utils.hasProperty( this.bundleFilesAdded, dependencyFileName ) )
-                        {
-                            this.bundleFilesAdded[dependencyFileName] = true;
-                            this.bundleSourceFiles.push( dependencySourceFile );
-                        }
-                    }
-                }
-            }
-            else
-            {
-                // The module source file is a DeclarationFile...
-
-                if ( moduleDependencyNode.kind === ts.SyntaxKind.ImportEqualsDeclaration )
-                {
-                    this.bundleImportEquals.add( moduleDependencyNode as ts.ImportEqualsDeclaration );
-                }
-                else
-                {
-                    // Should aways be ImportDeclaration kind..
-                    if ( moduleDependencyNode.kind === ts.SyntaxKind.ImportDeclaration )
-                    {
-                        this.bundleImports.add( <ts.ImportDeclaration>moduleDependencyNode );
-                    }
-                }
-            }
+            containerModuleBlock = ts.updateModuleBlock( containerModuleBlock, [...containerModuleBlock.statements, moduleNamespace] );
         }
 
-        const isGeneratedNamespace = bundleContainer.isInternal();
-        if ( isGeneratedNamespace )
-        {
-            // TODO: addExportNamespace block
+        containerNamespace = ts.updateModuleDeclaration(
+            containerNamespace,
+            undefined, undefined,
+            containerNamespace.name, containerModuleBlock );
 
-            // The module container was created from the bundle annotation.
-            // Wrap the bundle module container in an exported namespace with the bundle name
-            //this.bundleCodeText += "export namespace " + bundleContainer.getName() + " {\r\n";
+        bundleSourceFile = ts.updateSourceFileNode( bundleSourceFile, [containerNamespace] );
+
+        // Finally, add the entry point module
+        let modifiedEntry = this.convertAnyImportOrExport( moduleContainer.getEntryPoint(), containerName );
+        bundleSourceFile = ts.updateSourceFileNode( bundleSourceFile, [...bundleSourceFile.statements,...modifiedEntry.statements] );
+        
+        return bundleSourceFile;
+    }
+
+    private convertModuleToNamespace( module: Module, containerName: ts.ModuleName ) : ts.ModuleDeclaration
+    {
+        let modifiedSourceFile = this.convertAnyImportOrExport( module, containerName );
+        let moduleName = this.generateModuleName( module.getDeclaration() );
+        
+        return this.createNamespaceForModule( moduleName, modifiedSourceFile );
+    }
+
+    private convertAnyImportOrExport( module: Module, containerName: ts.ModuleName ): ts.SourceFile
+    {
+        const visitor: ts.Visitor = ( node: ts.Node ) =>
+        {
+            if ( Ast.isAnyImportOrExport( node ) )
+            {
+                switch ( node.kind )
+                {
+                    case ts.SyntaxKind.ImportDeclaration:
+                        return this.replaceImportWithVar( node as ts.ImportDeclaration, containerName );
+
+                    case ts.SyntaxKind.ImportEqualsDeclaration:
+                        return this.replaceImportEqualsWithVar( node as ts.ImportEqualsDeclaration, containerName );
+
+                    case ts.SyntaxKind.ExportDeclaration:
+                        return undefined;
+                }
+            }
+
+            return ts.visitEachChild( node, visitor, this.context );
         }
+
+        let sourceFile = ts.getMutableClone( module.getSourceFile() );
+
+        return ts.visitNode( sourceFile, visitor );
+    }
+
+    private replaceImportWithVar( node: ts.ImportDeclaration, containerName: ts.ModuleName ): ts.Node | ts.Node[]
+    {
+        const {
+            defaultName,
+            namespace,
+            namedElements
+        } = this.getImportProperties( node );
+
+        let declarationSourceFile = Ast.getSourceFileFromAnyImportExportNode( node, this.typeChecker );
+
+        let variableExpression: ts.Expression;
+        if ( declarationSourceFile && declarationSourceFile.isDeclarationFile )
+        {
+            // For d.ts files the var statement expression is a require("mod") call
+            variableExpression = this.createRequireCall(
+                ts.createLiteral( ( node.moduleSpecifier as ts.StringLiteral ).text ) );
+        }
+        else
+        {
+            // for source code files: var {variableName} = {containerName}.{moduleName} 
+            let moduleNamespace = this.moduleNamespaces[declarationSourceFile.fileName] as ts.Identifier;
+
+            variableExpression = this.createContainerModulePropertyAccess(
+                containerName as ts.Identifier,
+                moduleNamespace );
+        }
+
+        if ( defaultName )
+        {
+            // TODO:
+        }
+
+        if ( namespace )
+        {
+            return this.createVariableStatement(
+                namespace,
+                variableExpression )
+        }
+
+        if ( namedElements.length > 0 )
+        {
+            let varStatements: ts.VariableStatement[] = [];
+            // We have an import of pattern: import { a, b as x } from "mod"
+            for ( let element of namedElements )
+            {
+                varStatements.push( this.createVariableStatement( element.name, variableExpression ) );
+            }
+
+            return varStatements;
+        }
+
+        return node;
+    }
+
+    private replaceImportEqualsWithVar( node: ts.ImportEqualsDeclaration, containerName: ts.ModuleName )
+    {
+        return node;
+    }
+
+    private createVariableForNamedImport( moduleSpecifier: string, namedImports: ts.ImportSpecifier[] ): ts.ImportDeclaration
+    {
+        // produce `import { {namedImports} } from '{moduleSpecifier}';
+        const namedImport = ts.createImportDeclaration(
+            undefined /*decorators*/,
+            undefined /*modifiers*/,
+            ts.createImportClause(
+                undefined /*name*/,
+                ts.createNamedImports( namedImports ) ),
+            ts.createLiteral( moduleSpecifier ) );
+
+        return namedImport;
+    }
+
+    private createContainerModulePropertyAccess( containerName: ts.Identifier, moduleName: ts.Identifier ): ts.PropertyAccessExpression
+    {
+        return ts.createPropertyAccess(
+            containerName,
+            moduleName );
+    }
+
+    private createVariableStatement( name: ts.Identifier, expression: ts.Expression ): ts.VariableStatement
+    {
+        const variableStatement = ts.createVariableStatement(
+            undefined /*modifiers*/,
+            [ts.createVariableDeclaration(
+                name,
+                undefined /* type */,
+                expression)] )
+
+        return variableStatement;
+    }
+
+    private createRequireCall( moduleName: ts.Expression ): ts.Expression
+    {
+        return ts.createCall( ts.createIdentifier( "require" ), /*typeArguments*/ undefined, [moduleName] );
+    }
+
+    private createQualifiedNameForModule( containerName: ts.EntityName, moduleName: ts.Identifier ): ts.EntityName
+    {
+        return ts.createQualifiedName(
+            containerName,
+            moduleName );
+
+        //ts.createPropertyAccess( )
+    }
+
+    private createNamespaceForModule( moduleName: string, sourceFile: ts.SourceFile ): ts.ModuleDeclaration
+    {
+        const moduleDeclaration = ts.createModuleDeclaration(
+            undefined /*decorators*/,
+            [ts.createModifier( ts.SyntaxKind.ExportKeyword )],
+            ts.createIdentifier( moduleName ),
+            ts.createModuleBlock( [...sourceFile.statements] ) );
+
+        return moduleDeclaration;
+    }
+
+    private createNamespaceForModuleContainer( moduleName: string, moduleBlock: ts.ModuleBlock ): ts.ModuleDeclaration
+    {
+        const moduleDeclaration = ts.createModuleDeclaration(
+            undefined /*decorators*/,
+            undefined/*modifiers*/,
+            ts.createIdentifier( moduleName ),
+            moduleBlock );
+
+        return moduleDeclaration;
     }
 
     private checkModuleInheritance( moduleDependencyNode: ts.Node, dependencyNodes: ts.Node[] )
@@ -213,70 +336,6 @@ export class BundleBuilder
         return false;
     }
 
-    private generateBundleSourceFile(): ts.SourceFile
-    {
-        this.bundleSourceFile = ts.createSourceFile(
-            "bundle.ts",
-            "",
-            this.program.getCompilerOptions().target );
-
-        const importStatements = this.createImports();
-
-        this.bundleSourceFile = ts.updateSourceFileNode( this.bundleSourceFile, importStatements );
-
-        this.addSourceFiles();
-
-        return this.bundleSourceFile;
-    }
-
-    private createImports(): ts.Statement[]
-    {
-        let importStatements: ts.Statement[] = [];
-
-        // First add import equals imports...
-        for ( const moduleReference in this.bundleImportEquals.getModuleReferences() )
-        {   
-            let imports = this.bundleImportEquals.getModuleReferenceImports( moduleReference );
-
-            for ( let importEquals of imports )
-            {
-                // Import equals declarationss are simply added to the bundle source file statements
-                importStatements.push( importEquals );
-            }
-        }
-
-        // Next add the import declarations...
-        for ( const moduleSpecifier of this.bundleImports.getModuleSpecifiers() )
-        {
-            const {
-                defaultNames,
-                namespaces,
-                namedElements
-            } = this.bundleImports.getModuleSpecifierImportProperties( moduleSpecifier );
-
-            if ( defaultNames.length > 0 )
-            {
-                // TJT: It doesn't make sense to have multiple default imports for a module specifier
-                importStatements.push( this.createDefaultImportDeclaration( moduleSpecifier, defaultNames[0] ) );
-            }
-
-            if ( namespaces.length > 0 )
-            {
-                for ( const namespace of namespaces )
-                {
-                    importStatements.push( this.createNamespaceImportDeclaration( moduleSpecifier, namespace ) );
-                }
-            }
-
-            if ( namedElements.length > 0 )
-            {
-                importStatements.push( this.createNamedImportDeclaration( moduleSpecifier, namedElements ) );
-            }
-        }
-
-        return importStatements;
-    }
-
     private createDefaultImportDeclaration( moduleSpecifier: string, defaultName: ts.Identifier ): ts.ImportDeclaration
     {
         // produce `import {defaultName} from '{specifier}';
@@ -289,98 +348,6 @@ export class BundleBuilder
             ts.createLiteral( moduleSpecifier ) );
 
         return defaultImport;
-    }
-
-    private createNamespaceImportDeclaration( moduleSpecifier: string, namespace: ts.Identifier ): ts.ImportDeclaration
-    {
-        // produce `import * as {namespace} from '{moduleSpecifier}';
-        const namespaceImport = ts.createImportDeclaration(
-            undefined /*decorators*/,
-            undefined /*modifiers*/,
-            ts.createImportClause(
-                undefined /*name*/,
-                ts.createNamespaceImport( namespace ) ),
-            ts.createLiteral( moduleSpecifier ) );
-
-        return namespaceImport;
-    }
-
-    private createNamedImportDeclaration( moduleSpecifier: string, namedImports: ts.ImportSpecifier[] ): ts.ImportDeclaration
-    {
-        // produce `import { {namedImports} } from '{moduleSpecifier}';
-        const namedImport = ts.createImportDeclaration(
-            undefined /*decorators*/,
-            undefined /*modifiers*/,
-            ts.createImportClause(
-                undefined /*name*/,
-                ts.createNamedImports( namedImports ) ),
-            ts.createLiteral( moduleSpecifier ) );
-
-        return namedImport;
-    }
-
-    private addSourceFiles()
-    {
-
-    }
-
-    private updateSourceFile( sourceFile: ts.SourceFile ): ts.SourceFile
-    {
-        const visitor: ts.Visitor = ( node: ts.Node ): ts.Node =>
-        {
-            if ( Ast.isAnyImportOrExport( node ) )
-            {
-                // TJT: Review the logic here! 
-
-                let moduleNameExpression = Ast.getExternalModuleName( node );
-
-                if ( moduleNameExpression && moduleNameExpression.kind === ts.SyntaxKind.StringLiteral )
-                {
-                    let moduleSymbol = this.program.getTypeChecker().getSymbolAtLocation( moduleNameExpression );
-
-                    if ( ( moduleSymbol ) && ( Ast.isSourceCodeModule( moduleSymbol ) || Ast.isAmbientModule( moduleSymbol ) ) )
-                    {
-                        // Remove node here
-                        return undefined;
-                    }
-                }
-            }
-            else
-            {
-                if ( node.kind === ts.SyntaxKind.ModuleDeclaration )
-                {
-                    let module = <ts.ModuleDeclaration>node;
-
-                    if ( this.bundleConfig.package && this.bundleConfig.package.getPackageType() === PackageType.Component )
-                    {
-                        if ( module.name.getText() !== this.bundleConfig.package.getPackageNamespace() )
-                        {
-                            if ( module.flags & ts.NodeFlags.ExportContext )
-                            {
-                                Logger.info( "Component bundle. Module name != package namespace. Removing export modifier." );
-                                let nodeModifier = module.modifiers[0];
-                                // FIXME: update node - remove export modifier
-                                //editText = this.whiteOut( nodeModifier.pos, nodeModifier.end, editText );
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    if ( Ast.getModifierFlagsNoCache( node ) & ts.ModifierFlags.Export )
-                    {
-                        Logger.info( "Removing export modifier for non module declaration." );
-                        let exportModifier = node.modifiers[0];
-                        // FIXME: remove export modifier
-                        // editText = this.whiteOut( exportModifier.pos, exportModifier.end, editText );
-                    }
-                }
-            }
-
-            return ts.visitEachChild( node, visitor, this.context );
-        }
-
-        return ts.visitNode( sourceFile, visitor );
     }
 
     private getSymbolFromNode( node: ts.Node ): ts.Symbol
@@ -420,6 +387,52 @@ export class BundleBuilder
 
         return bindingNames;
     }
+
+    private generateModuleName( declaration: Ast.AnyImportOrExport ): string
+    {
+        const moduleNameExpression = Ast.getExternalModuleName( declaration );
+        const baseName = path.basename( (moduleNameExpression as ts.StringLiteral).text );
+
+        return baseName; //makeUniqueName()
+    }
+
+    private getImportProperties( importDeclaration: ts.ImportDeclaration )
+    {
+        let defaultName: ts.Identifier = undefined;
+        let namespace: ts.Identifier = undefined;
+        let namedElements: ts.ImportSpecifier[] = [];
+
+        const { name, namedBindings } = importDeclaration.importClause;
+
+        if ( name )
+        {
+            defaultName = name;
+        }
+
+        if ( namedBindings )
+        {
+            if ( Ast.isNamespaceImport( namedBindings ) )
+            {
+                namespace = ( namedBindings as ts.NamespaceImport ).name;
+            }
+            else
+            {
+                let elements = ( namedBindings as ts.NamedImports ).elements;
+
+                for ( const element of elements )
+                {
+                    namedElements.push( element );
+                }
+            }
+        }
+
+        return {
+            defaultName,
+            namespace,
+            namedElements,
+        };
+    }
+    
 
     //private reportStatistics()
     //{

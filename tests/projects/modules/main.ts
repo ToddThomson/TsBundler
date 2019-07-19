@@ -1,5 +1,5 @@
-﻿import { Greeter } from "./Greeter"
-import * as hi from "./hello"
+﻿import { Greeter } from "./GreeterModule"
+import * as t from "./hello"
 
 export class Main
 {
@@ -8,7 +8,7 @@ export class Main
         let greeter = new Greeter();
         console.log( greeter.SayHello() );
 
-        let anotherGreeter = new hi.Hello();
+        let anotherGreeter = new t.Hello();
         console.log( anotherGreeter.sayHi() );
     }
 }

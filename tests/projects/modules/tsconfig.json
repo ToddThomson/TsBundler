@@ -3,11 +3,11 @@
 
   "compilerOptions": {
     "noImplicitAny": true,
-    "module": "amd",
+    "module": "es6",
     "noEmitOnError": true,
     "removeComments": false,
     "sourceMap": true,
-    "target": "es5",
+    "target": "es6",
     "typeRoots": [
       "./node_modules/@types",
       "./node_modules"
