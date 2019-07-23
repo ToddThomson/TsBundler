@@ -101,7 +101,7 @@
     <TypeScriptCompile Include="tests\projects\modules\Bundle.ts">
       <SubType>Code</SubType>
     </TypeScriptCompile>
-    <TypeScriptCompile Include="tests\projects\modules\GreeterModule.ts" />
+    <TypeScriptCompile Include="tests\projects\modules\Greeter.ts" />
     <TypeScriptCompile Include="tests\projects\modules\Hello.ts" />
     <TypeScriptCompile Include="tests\projects\modules\main.ts" />
     <TypeScriptCompile Include="tests\projects\simple\Hello.ts">
@@ -114,6 +114,12 @@
       <SubType>Code</SubType>
     </TypeScriptCompile>
     <TypeScriptCompile Include="tests\projects\simple\test\Hello.ts" />
+    <TypeScriptCompile Include="tests\projects\simple\test\importRef.ts">
+      <SubType>Code</SubType>
+    </TypeScriptCompile>
+    <TypeScriptCompile Include="tests\projects\simple\test\Ref.ts">
+      <SubType>Code</SubType>
+    </TypeScriptCompile>
     <TypeScriptCompile Include="tests\spec\BundleTransform\BundleTransformTest.ts">
       <SubType>Code</SubType>
       <TestFramework>Mocha</TestFramework>

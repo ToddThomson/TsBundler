@@ -45,7 +45,7 @@ namespace __modules__main
     }
 }
 
-// import { Greeter } from "./GreeterModule"; convert to =>
+// import { Greeter } from "./Greeter";
 var Greeter = __modules__main.Greeter.Greeter;
 //import * as t from "./hello"
 var t = __modules__main.Hello;

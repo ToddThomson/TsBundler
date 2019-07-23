@@ -5,7 +5,7 @@ import { BundlePackage } from "./BundlePackage";
 import { PackageType } from "./PackageType";
 import { Logger } from "../../../TsToolsCommon/src/Reporting/Logger";
 import { Utils } from "../../../TsToolsCommon/src/Utils/Utilities";
-import { TsCore } from "../../../TsToolsCommon/src/Typescript/TsCore";
+import { TsCore } from "../../../TsToolsCommon/src/Typescript/Core";
 
 export interface BundleConfigResult {
     bundles: Bundle[];

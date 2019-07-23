@@ -1,4 +1,4 @@
-﻿import { Greeter } from "./GreeterModule"
+﻿import { Greeter } from "./Greeter"
 import * as t from "./hello"
 
 export class Main
