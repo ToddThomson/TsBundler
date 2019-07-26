@@ -12,9 +12,10 @@ export interface BundleConfigResult {
     errors: ts.Diagnostic[];
 }
 
-export class BundleConfigParser {
-    
-    public parseConfigFile( json: any, basePath: string ): BundleConfigResult {
+export class BundleConfigParser
+{
+    public parseConfigFile( json: any, basePath: string ): BundleConfigResult
+    {
         var errors: ts.Diagnostic[] = [];
 
         return {
@@ -22,14 +23,17 @@ export class BundleConfigParser {
             errors: errors
         };
 
-        function getBundles(): Bundle[] {
+        function getBundles(): Bundle[]
+        {
             var bundles: Bundle[] = [];
             var jsonBundles = json["bundles"];
 
-            if ( jsonBundles ) {
+            if ( jsonBundles )
+            {
                 Logger.info( jsonBundles );
 
-                for ( var id in jsonBundles ) {
+                for ( var id in jsonBundles )
+                {
                     var jsonBundle: any = jsonBundles[id];
                     var bundleName: string;
                     var fileNames: string[] = [];
@@ -39,33 +43,39 @@ export class BundleConfigParser {
                     bundleName = path.join( basePath, id );
 
                     // Files..
-                    if ( Utils.hasProperty( jsonBundle, "files" ) ) {
-                        if ( jsonBundle["files"] instanceof Array ) {
+                    if ( Utils.hasProperty( jsonBundle, "files" ) )
+                    {
+                        if ( jsonBundle["files"] instanceof Array )
+                        {
                             fileNames = Utils.map( <string[]>jsonBundle["files"], s => path.join( basePath, s ) );
                         }
-                        else {
+                        else
+                        {
                             errors.push( TsCore.createDiagnostic( { code: 6063, category: ts.DiagnosticCategory.Error, key: "Bundle_0_files_is_not_an_array_6063", message: "Bundle '{0}' files is not an array." }, id ) );
                         }
                     }
-                    else {
+                    else
+                    {
                         errors.push( TsCore.createDiagnostic( { code: 6062, category: ts.DiagnosticCategory.Error, key: "Bundle_0_requires_an_array_of_files_6062", message: "Bundle '{0}' requires an array of files." }, id ) );
                     }
 
                     // Config..
-                    if ( Utils.hasProperty( jsonBundle, "config" ) ) {
+                    if ( Utils.hasProperty( jsonBundle, "config" ) )
+                    {
                         config = jsonBundle.config;
                     }
 
                     config.package = parsePackageConfig( config );
 
-                    bundles.push( { name: bundleName, fileNames: fileNames, config: config } );
+                    bundles.push( { name: bundleName, entryFileNames: fileNames, config: config } );
                 }
             }
 
             return bundles;
         }
 
-        function parsePackageConfig( config: any ): BundlePackage {
+        function parsePackageConfig( config: any ): BundlePackage
+        {
 
             // TODO: Add diagnostics for input errors..
 
@@ -78,20 +88,25 @@ export class BundleConfigParser {
                 "component": PackageType.Component
             };
 
-            if ( Utils.hasProperty( config, "package" ) ) {
-                let packageType: string = config[ "package" ];
+            if ( Utils.hasProperty( config, "package" ) )
+            {
+                let packageType: string = config["package"];
 
-                if ( typeof( packageType ) === "string" ) {
-                    if ( Utils.hasProperty( packageTypeMap, packageType.toLowerCase() ) ) {
-                        bundlePackageType = packageTypeMap[ packageType.toLowerCase() ]
+                if ( typeof ( packageType ) === "string" )
+                {
+                    if ( Utils.hasProperty( packageTypeMap, packageType.toLowerCase() ) )
+                    {
+                        bundlePackageType = packageTypeMap[packageType.toLowerCase()]
                     }
                 }
             }
 
-            if ( Utils.hasProperty( config, "packageNamespace" ) ) {
-                let packageNamespace = config[ "packageNamespace" ];
-                    
-                if ( typeof( packageNamespace ) === "string" ) {
+            if ( Utils.hasProperty( config, "packageNamespace" ) )
+            {
+                let packageNamespace = config["packageNamespace"];
+
+                if ( typeof ( packageNamespace ) === "string" )
+                {
                     bundlePackageNamespace = packageNamespace;
                 }
             }

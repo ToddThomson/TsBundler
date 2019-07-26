@@ -10,7 +10,7 @@
     "declaration": false,
     "target": "es5",
     "typeRoots": [
-      "./node_modules"
+       "./node_modules"
     ],
     "types": [
       "node",
@@ -19,17 +19,5 @@
   },
   "exclude": [
     "node_modules"
-  ],
-
-  "bundles": {
-    "main": {
-      "files": [ "./main.ts" ],
-      "config": {
-        "package": "component",
-        "packageNamespace": "Main",
-        "outDir": "./bundle",
-        "minify": false
-      }
-    }
-  }
+  ]
 }

@@ -2,17 +2,12 @@
 import * as path from "path"
 import { Bundle } from "./Bundle"
 import { BundleConfig } from "./BundleConfig"
-import { BundleConfigParser } from "./BundlerConfigParser"
-import { BundlePackage } from "./BundlePackage"
-import { PackageType } from "./PackageType"
-import { ImportCollection } from "./ImportCollection"
-import { ImportEqualsCollection } from "./ImportEqualsCollection"
 import { BundlerOptions } from "./BundlerOptions"
 import { BundleBuildResult } from "./BundleBuildResult"
 import { DependencyBuilder } from "./DependencyBuilder"
 import { Module } from "./Module"
 import { ModuleContainer } from "./ModuleContainer"
-import { Utils } from "../../../TsToolsCommon/src/Utils/Utilities"
+import { TsCore } from "../../../TsToolsCommon/src/typescript/core"
 import { Ast } from "../../../TsToolsCommon/src/Typescript/AstHelpers"
 import { Factory } from "../../../TsToolsCommon/src/Typescript/TransformHelpers"
 import { Logger } from "../../../TsToolsCommon/src/Reporting/Logger"
@@ -27,32 +22,77 @@ export class BundleBuilder
     private typeChecker: ts.TypeChecker;
     private context: ts.TransformationContext;
 
-    private sourceFile: ts.SourceFile;
+    private entrySourceFile: ts.SourceFile;
 
     private moduleNamespaces: ts.MapLike<ts.ModuleName> = {};
 
-    constructor( program: ts.Program, bundlerOptions: BundlerOptions )
+    constructor( program: ts.Program, options?: BundlerOptions )
     {
         this.program = program;
         this.typeChecker = program.getTypeChecker();
-        this.options = bundlerOptions;
+        this.options = options;
     }
 
     public transform( entrySourceFile: ts.SourceFile, context: ts.TransformationContext ): ts.SourceFile
     {
-        Logger.setLevel( 4 );
+         this.context = context;
 
-        this.sourceFile = entrySourceFile;
-        this.context = context;
-
-        return this.buildBundle();
+        return this.buildBundle( entrySourceFile );
     }
 
-    private buildBundle(): ts.SourceFile
+    public build( bundle: Bundle ): BundleBuildResult
     {
+        this.bundle = bundle;
+
+        // Construct bundle output file name
+        let bundleBaseDir = path.dirname( bundle.name );
+
+        if ( bundle.config.outDir )
+        {
+            bundleBaseDir = path.join( bundleBaseDir, bundle.config.outDir );
+        }
+
+        let bundleFilePath = path.join( bundleBaseDir, path.basename( bundle.name ) );
+        bundleFilePath = TsCore.normalizeSlashes( bundleFilePath );
+
+        for ( var filesKey in bundle.entryFileNames )
+        {
+            let fileName = bundle.entryFileNames[filesKey];
+
+            let bundleSourceFile = this.program.getSourceFile( fileName );
+
+            if ( !bundleSourceFile )
+            {
+                let diagnostic = TsCore.createDiagnostic( {
+                    code: 6060,
+                    category: ts.DiagnosticCategory.Error,
+                    key: "Bundle_source_file_0_not_found_6060",
+                    message: "Bundle source file '{0}' not found."
+                }, fileName );
+
+                return new BundleBuildResult( [diagnostic] );
+            }
+
+            this.buildBundle( bundleSourceFile );
+        }
+
+        var bundleExtension = ".ts";
+        var bundleFile = {
+            path: bundleFilePath + bundleExtension,
+            extension: bundleExtension,
+            text: "" /* fixme */
+        };
+
+        return new BundleBuildResult( [], bundleFile );
+    }
+
+    public buildBundle( entrySourceFile: ts.SourceFile ): ts.SourceFile
+    {
+        this.entrySourceFile = entrySourceFile;
+
         const dependencyBuilder = new DependencyBuilder( this.program );
 
-        let bundleContainer = dependencyBuilder.getSourceFileDependencies( this.sourceFile );
+        let bundleContainer = dependencyBuilder.getSourceFileDependencies( this.entrySourceFile );
        
         return this.generateBundleSourceFile( bundleContainer );
     }
@@ -85,7 +125,7 @@ export class BundleBuilder
                 undefined, undefined,
                 containerNamespace.name, containerModuleBlock );
 
-            let bundleSourceFile = ts.getMutableClone( this.sourceFile );
+            let bundleSourceFile = ts.getMutableClone( this.entrySourceFile );
             bundleSourceFile = ts.updateSourceFileNode( bundleSourceFile, [containerNamespace] );
 
             // Finally, add the entry point module
@@ -95,7 +135,7 @@ export class BundleBuilder
             return bundleSourceFile;
         }
 
-        return ts.visitNode( this.sourceFile, visitor );
+        return ts.visitNode( this.entrySourceFile, visitor );
     }
 
     private convertModuleToNamespace( module: Module, containerName: ts.ModuleName ) : ts.ModuleDeclaration

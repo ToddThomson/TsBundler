@@ -39,6 +39,7 @@
   <ItemGroup>
     <Content Include=".gitattributes" />
     <Content Include=".gitignore" />
+    <Content Include=".mocharc.json" />
     <Content Include=".npmignore" />
     <Content Include=".travis.yml" />
     <Content Include="build\paths.js" />
@@ -49,10 +50,13 @@
     <Content Include="gulpfile.js" />
     <Content Include="lib\TsBundler.js" />
     <Content Include="LICENSE" />
+    <Content Include="package-lock.json" />
     <Content Include="package.json" />
     <Content Include="README.md" />
     <Content Include="src\tsconfig.json" />
+    <Content Include="tests\projects\greeter\tsconfig.json" />
     <Content Include="tests\projects\modules\tsconfig.json" />
+    <Content Include="tests\projects\nobundles\tsconfig.json" />
     <Content Include="tests\projects\simple\tsconfig.json">
       <SubType>Code</SubType>
     </Content>
@@ -66,11 +70,14 @@
     <Folder Include="src\" />
     <Folder Include="src\Bundler\" />
     <Folder Include="tests\projects\modules\" />
-    <Folder Include="tests\projects\simple\test\" />
+    <Folder Include="tests\projects\greeter\" />
+    <Folder Include="tests\projects\nobundles\" />
+    <Folder Include="tests\projects\simple\" />
     <Folder Include="tests\spec\" />
     <Folder Include="tests\projects\" />
-    <Folder Include="tests\projects\simple\" />
     <Folder Include="tests\spec\BundleTransform\" />
+    <Folder Include="tests\spec\Configuration\" />
+    <Folder Include="tests\spec\Project\" />
   </ItemGroup>
   <ItemGroup>
     <TypeScriptCompile Include="lib\TsBundler.d.ts" />
@@ -98,34 +105,33 @@
     <TypeScriptCompile Include="src\Bundler\Module.ts" />
     <TypeScriptCompile Include="src\Bundler\PackageType.ts" />
     <TypeScriptCompile Include="src\Bundler\BundlerTransform.ts" />
+    <TypeScriptCompile Include="tests\projects\greeter\Greeter.ts" />
+    <TypeScriptCompile Include="tests\projects\greeter\Hello.ts" />
+    <TypeScriptCompile Include="tests\projects\greeter\main.ts" />
     <TypeScriptCompile Include="tests\projects\modules\Bundle.ts">
       <SubType>Code</SubType>
     </TypeScriptCompile>
     <TypeScriptCompile Include="tests\projects\modules\Greeter.ts" />
     <TypeScriptCompile Include="tests\projects\modules\Hello.ts" />
     <TypeScriptCompile Include="tests\projects\modules\main.ts" />
-    <TypeScriptCompile Include="tests\projects\simple\Hello.ts">
-      <SubType>Code</SubType>
-    </TypeScriptCompile>
+    <TypeScriptCompile Include="tests\projects\nobundles\ImportRef.ts" />
+    <TypeScriptCompile Include="tests\projects\nobundles\main.ts" />
     <TypeScriptCompile Include="tests\projects\simple\main.ts">
       <SubType>Code</SubType>
     </TypeScriptCompile>
-    <TypeScriptCompile Include="tests\projects\simple\Greeter.ts">
-      <SubType>Code</SubType>
-    </TypeScriptCompile>
-    <TypeScriptCompile Include="tests\projects\simple\test\Hello.ts" />
-    <TypeScriptCompile Include="tests\projects\simple\test\importRef.ts">
-      <SubType>Code</SubType>
-    </TypeScriptCompile>
-    <TypeScriptCompile Include="tests\projects\simple\test\Ref.ts">
+    <TypeScriptCompile Include="tests\projects\simple\ImportRef.ts">
       <SubType>Code</SubType>
     </TypeScriptCompile>
     <TypeScriptCompile Include="tests\spec\BundleTransform\BundleTransformTest.ts">
       <SubType>Code</SubType>
       <TestFramework>Mocha</TestFramework>
     </TypeScriptCompile>
-    <TypeScriptCompile Include="bundle.ts">
+    <TypeScriptCompile Include="tests\spec\Configuration\BundleConfigurationTests.ts">
       <SubType>Code</SubType>
+      <TestFramework>Mocha</TestFramework>
+    </TypeScriptCompile>
+    <TypeScriptCompile Include="tests\spec\Project\BuilderTests.ts">
+      <TestFramework>Mocha</TestFramework>
     </TypeScriptCompile>
   </ItemGroup>
   <Import Project="$(VSToolsPath)\Node.js Tools\Microsoft.NodejsToolsV2.targets" />

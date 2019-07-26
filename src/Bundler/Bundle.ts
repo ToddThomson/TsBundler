@@ -2,6 +2,6 @@
 
 export interface Bundle {
     name: string;
-    fileNames: string[];
+    entryFileNames: string[];
     config: BundleConfig;
 }

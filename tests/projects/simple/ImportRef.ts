@@ -1,0 +1,1 @@
+﻿export var s = 7;

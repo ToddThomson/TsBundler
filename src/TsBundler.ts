@@ -5,7 +5,9 @@ import { BundleConfigParser, BundleConfigResult } from "./Bundler/BundlerConfigP
 import { PackageType } from "./Bundler/PackageType"
 import { BundlePackage } from "./Bundler/BundlePackage"
 import { BundleConfig } from "./Bundler/BundleConfig"
-import { Bundle } from "./Bundler/Bundle";
+import { Bundle } from "./Bundler/Bundle"
+import { BundleFile, BundleBuildResult } from "./Bundler/BundleBuildResult"
+import { BundleBuilder } from "./Bundler/BundleBuilder"
 
 // TsBundler Exported Types..
 export { PackageType }
@@ -14,7 +16,10 @@ export { BundleConfig }
 export { Bundle };
 export { BundlerOptions }
 export { BundleConfigResult }
-export { BundleConfigParser };
+export { BundleConfigParser }
+export { BundleFile }
+export { BundleBuildResult }
+export { BundleBuilder }
 
 export namespace TsBundler
 {
@@ -30,5 +35,12 @@ export namespace TsBundler
     {
         const bundlerTransform = new BundlerTransform( options );
         return ( context: ts.TransformationContext ) => bundlerTransform.transform( program, context );
+    }
+
+    export function buildBundle( bundle: Bundle, program: ts.Program, options?: BundlerOptions ): BundleBuildResult
+    {
+        const bundler = new BundleBuilder( program, options );
+
+        return bundler.build( bundle );
     }
 }
